@@ -1,0 +1,331 @@
+import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
+import { 
+  Box, Typography, Button, IconButton, Paper, Grid, 
+  Avatar, LinearProgress, styled, Container, useTheme
+} from '@mui/material';
+import {
+  Home as HomeIcon,
+  Analytics as AnalyticsIcon,
+  Folder as ResourcesIcon,
+  List as LogsIcon,
+  ExitToApp as SignOutIcon,
+  Dashboard as DashboardIcon,
+  Storage as ClusterIcon,
+  Dns as NodeIcon,
+  ShowChart as MetricsIcon,
+  Timeline as TimelineIcon,
+  PieChart as PieChartIcon,
+  Storage as StorageIcon,	
+  Public as GlobalIcon
+} from '@mui/icons-material';
+import { motion } from 'framer-motion';
+
+// Gradient background styling
+const GradientBox = styled(Box)(({ theme }) => ({
+  minHeight: '100vh',
+  background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+  padding: theme.spacing(3),
+}));
+
+// Header component
+const Header = ({ currentView, setCurrentView, handleLogout }) => {
+  const theme = useTheme();
+  
+  const navItems = [
+    { name: 'Home', icon: <HomeIcon /> },
+    { name: 'Analyzer', icon: <AnalyticsIcon /> },
+    { name: 'Resources', icon: <ResourcesIcon /> },
+    { name: 'Logs', icon: <LogsIcon /> }
+  ];
+
+  return (
+    <Box sx={{
+      display: 'flex',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      padding: theme.spacing(2),
+      backgroundColor: 'rgba(255, 255, 255, 0.1)',
+      backdropFilter: 'blur(10px)',
+      borderRadius: '12px',
+      marginBottom: theme.spacing(3),
+      boxShadow: '0 4px 30px rgba(0, 0, 0, 0.1)'
+    }}>
+      {/* Logo */}
+      <Box sx={{ display: 'flex', alignItems: 'center' }}>
+        <DashboardIcon sx={{ 
+          fontSize: 40, 
+          color: 'white',
+          marginRight: theme.spacing(1)
+        }} />
+        <Typography variant="h5" sx={{ 
+          color: 'white',
+          fontWeight: 'bold',
+          fontFamily: '"Poppins", sans-serif'
+        }}>
+          GrepMind
+        </Typography>
+      </Box>
+
+      {/* Navigation */}
+      <Box sx={{ display: 'flex', gap: theme.spacing(1) }}>
+        {navItems.map((item) => (
+          <Button
+            key={item.name}
+            startIcon={item.icon}
+            onClick={() => setCurrentView(item.name)}
+            sx={{
+              color: currentView === item.name ? 'white' : 'rgba(255, 255, 255, 0.7)',
+              backgroundColor: currentView === item.name ? 'rgba(255, 255, 255, 0.2)' : 'transparent',
+              '&:hover': {
+                backgroundColor: 'rgba(255, 255, 255, 0.15)',
+                color: 'white'
+              },
+              borderRadius: '8px',
+              textTransform: 'none',
+              padding: theme.spacing(1, 2),
+              transition: 'all 0.3s ease'
+            }}
+          >
+            {item.name}
+          </Button>
+        ))}
+      </Box>
+
+      {/* Sign Out */}
+      <IconButton 
+        onClick={handleLogout}
+        sx={{
+          color: 'white',
+          backgroundColor: 'rgba(255, 255, 255, 0.1)',
+          '&:hover': {
+            backgroundColor: 'rgba(255, 255, 255, 0.2)'
+          }
+        }}
+      >
+        <SignOutIcon />
+      </IconButton>
+    </Box>
+  );
+};
+
+// View components
+const HomeView = () => (
+  <Box>
+    <Typography variant="h4" gutterBottom sx={{ color: 'white' }}>
+      Welcome to GrepMind Dashboard
+    </Typography>
+    <Typography sx={{ color: 'rgba(255, 255, 255, 0.8)', mb: 3 }}>
+      Your centralized monitoring and analytics platform
+    </Typography>
+  </Box>
+);
+
+const AnalyzerView = () => (
+  <Box>
+    <Typography variant="h4" gutterBottom sx={{ color: 'white' }}>
+      Cluster Analyzer
+    </Typography>
+    {/* Add your analyzer components here */}
+  </Box>
+);
+
+const ResourcesView = () => (
+  <Box>
+    <Typography variant="h4" gutterBottom sx={{ color: 'white' }}>
+      System Resources
+    </Typography>
+    {/* Add your resources components here */}
+  </Box>
+);
+
+const LogsView = () => (
+  <Box>
+    <Typography variant="h4" gutterBottom sx={{ color: 'white' }}>
+      Application Logs
+    </Typography>
+    {/* Add your logs components here */}
+  </Box>
+);
+
+const Dashboard = () => {
+  const { logout } = useAuth();
+  const navigate = useNavigate();
+  const [currentView, setCurrentView] = useState('Home');
+  const [clusterHealth] = useState(85);
+  const [cpuUsage] = useState(65);
+  const [memoryUsage] = useState(72);
+  const [storageUsage] = useState(45);
+
+  const handleLogout = () => {
+    logout();
+    navigate('/login');
+  };
+
+  const renderView = () => {
+    switch (currentView) {
+      case 'Home': return <HomeView />;
+      case 'Analyzer': return <AnalyzerView />;
+      case 'Resources': return <ResourcesView />;
+      case 'Logs': return <LogsView />;
+      default: return <HomeView />;
+    }
+  };
+
+  return (
+    <GradientBox>
+      <Container maxWidth="xl">
+        <Header 
+          currentView={currentView} 
+          setCurrentView={setCurrentView} 
+          handleLogout={handleLogout} 
+        />
+
+        {renderView()}
+
+        {/* Dashboard Metrics (Example for Home View) */}
+        {currentView === 'Home' && (
+          <Grid container spacing={3} sx={{ mt: 2 }}>
+            {/* Cluster Health */}
+            <Grid item xs={12} md={6} lg={3}>
+              <MotionPaper>
+                <Box p={2}>
+                  <Box display="flex" alignItems="center" mb={1}>
+                    <ClusterIcon sx={{ color: '#4caf50', mr: 1 }} />
+                    <Typography variant="h6">Cluster Health</Typography>
+                  </Box>
+                  <LinearProgress 
+                    variant="determinate" 
+                    value={clusterHealth} 
+                    sx={{ 
+                      height: 10, 
+                      borderRadius: 5,
+                      mb: 1,
+                      backgroundColor: 'rgba(255, 255, 255, 0.2)',
+                      '& .MuiLinearProgress-bar': {
+                        backgroundColor: clusterHealth > 70 ? '#4caf50' : 
+                                        clusterHealth > 40 ? '#ff9800' : '#f44336'
+                      }
+                    }} 
+                  />
+                  <Typography variant="h4" sx={{ color: 'white' }}>
+                    {clusterHealth}%
+                  </Typography>
+                </Box>
+              </MotionPaper>
+            </Grid>
+
+            {/* CPU Usage */}
+            <Grid item xs={12} md={6} lg={3}>
+              <MotionPaper>
+                <Box p={2}>
+                  <Box display="flex" alignItems="center" mb={1}>
+                    <MetricsIcon sx={{ color: '#2196f3', mr: 1 }} />
+                    <Typography variant="h6">CPU Usage</Typography>
+                  </Box>
+                  <LinearProgress 
+                    variant="determinate" 
+                    value={cpuUsage} 
+                    sx={{ 
+                      height: 10, 
+                      borderRadius: 5,
+                      mb: 1,
+                      backgroundColor: 'rgba(255, 255, 255, 0.2)',
+                      '& .MuiLinearProgress-bar': {
+                        backgroundColor: cpuUsage > 70 ? '#f44336' : 
+                                        cpuUsage > 40 ? '#ff9800' : '#4caf50'
+                      }
+                    }} 
+                  />
+                  <Typography variant="h4" sx={{ color: 'white' }}>
+                    {cpuUsage}%
+                  </Typography>
+                </Box>
+              </MotionPaper>
+            </Grid>
+
+            {/* Memory Usage */}
+            <Grid item xs={12} md={6} lg={3}>
+              <MotionPaper>
+                <Box p={2}>
+                  <Box display="flex" alignItems="center" mb={1}>
+                    <StorageIcon sx={{ color: '#9c27b0', mr: 1 }} />
+                    <Typography variant="h6">Memory Usage</Typography>
+                  </Box>
+                  <LinearProgress 
+                    variant="determinate" 
+                    value={memoryUsage} 
+                    sx={{ 
+                      height: 10, 
+                      borderRadius: 5,
+                      mb: 1,
+                      backgroundColor: 'rgba(255, 255, 255, 0.2)',
+                      '& .MuiLinearProgress-bar': {
+                        backgroundColor: memoryUsage > 70 ? '#f44336' : 
+                                        memoryUsage > 40 ? '#ff9800' : '#4caf50'
+                      }
+                    }} 
+                  />
+                  <Typography variant="h4" sx={{ color: 'white' }}>
+                    {memoryUsage}%
+                  </Typography>
+                </Box>
+              </MotionPaper>
+            </Grid>
+
+            {/* Storage Usage */}
+            <Grid item xs={12} md={6} lg={3}>
+              <MotionPaper>
+                <Box p={2}>
+                  <Box display="flex" alignItems="center" mb={1}>
+                    <StorageIcon sx={{ color: '#ff9800', mr: 1 }} />
+                    <Typography variant="h6">Storage Usage</Typography>
+                  </Box>
+                  <LinearProgress 
+                    variant="determinate" 
+                    value={storageUsage} 
+                    sx={{ 
+                      height: 10, 
+                      borderRadius: 5,
+                      mb: 1,
+                      backgroundColor: 'rgba(255, 255, 255, 0.2)',
+                      '& .MuiLinearProgress-bar': {
+                        backgroundColor: storageUsage > 70 ? '#f44336' : 
+                                        storageUsage > 40 ? '#ff9800' : '#4caf50'
+                      }
+                    }} 
+                  />
+                  <Typography variant="h4" sx={{ color: 'white' }}>
+                    {storageUsage}%
+                  </Typography>
+                </Box>
+              </MotionPaper>
+            </Grid>
+
+            {/* Additional visualizations can be added here */}
+          </Grid>
+        )}
+      </Container>
+    </GradientBox>
+  );
+};
+
+// Animated Paper component
+const MotionPaper = ({ children }) => (
+  <motion.div whileHover={{ y: -5 }}>
+    <Paper sx={{ 
+      backgroundColor: 'rgba(255, 255, 255, 0.05)',
+      backdropFilter: 'blur(5px)',
+      borderRadius: '12px',
+      color: 'white',
+      height: '100%',
+      boxShadow: '0 8px 32px rgba(0, 0, 0, 0.1)',
+      border: '1px solid rgba(255, 255, 255, 0.1)'
+    }}>
+      {children}
+    </Paper>
+  </motion.div>
+);
+
+export default Dashboard;

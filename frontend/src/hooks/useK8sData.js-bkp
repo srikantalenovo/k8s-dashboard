@@ -1,0 +1,78 @@
+import { useState, useEffect } from 'react';
+import axios from 'axios';
+
+const useK8sData = () => {
+  const [clusterData, setClusterData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        // Simulate API call with mock data
+        const mockData = {
+          health: {
+            healthPercentage: 92,
+            nodes: 5,
+            pods: 42,
+            healthy: 39
+          },
+          cpuUsage: {
+            labels: ['00:00', '04:00', '08:00', '12:00', '16:00', '20:00'],
+            datasets: [
+              {
+                label: 'CPU Usage %',
+                data: [12, 19, 3, 5, 2, 3],
+                borderColor: 'rgb(75, 192, 192)',
+                tension: 0.1
+              }
+            ]
+          },
+          nodes: [
+            { name: 'node-1', status: 'Ready', cpuUsage: 15, memoryUsage: 32, type: 'physical' },
+            { name: 'node-2', status: 'Ready', cpuUsage: 22, memoryUsage: 45, type: 'physical' },
+            { name: 'node-3', status: 'NotReady', cpuUsage: 85, memoryUsage: 78, type: 'virtual' }
+          ],
+          podDistribution: {
+            labels: ['Running', 'Pending', 'Failed'],
+            datasets: [
+              {
+                data: [35, 5, 2],
+                backgroundColor: [
+                  'rgba(75, 192, 192, 0.6)',
+                  'rgba(255, 206, 86, 0.6)',
+                  'rgba(255, 99, 132, 0.6)'
+                ]
+              }
+            ]
+          },
+          networkTraffic: {
+            labels: ['Inbound', 'Outbound'],
+            datasets: [
+              {
+                label: 'Network Traffic (MB)',
+                data: [1250, 980],
+                backgroundColor: [
+                  'rgba(54, 162, 235, 0.6)',
+                  'rgba(255, 99, 132, 0.6)'
+                ]
+              }
+            ]
+          }
+        };
+        
+        setClusterData(mockData);
+        setLoading(false);
+      } catch (err) {
+        setError(err);
+        setLoading(false);
+      }
+    };
+
+    fetchData();
+  }, []);
+
+  return { clusterData, loading, error };
+};
+
+export default useK8sData;

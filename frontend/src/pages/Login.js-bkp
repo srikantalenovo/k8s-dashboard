@@ -1,0 +1,88 @@
+import React, { useState } from 'react';
+import { useAuth } from '../context/AuthContext';
+import { TextField, Button, Container, Typography, Box } from '@mui/material';
+import { Lock, Email } from '@mui/icons-material';
+import { motion } from 'framer-motion';
+import { Link } from 'react-router-dom';
+
+const Login = () => {
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+  const { login } = useAuth();
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    try {
+      await login(email, password);
+    } catch (err) {
+      setError('Invalid credentials. Please try again.');
+    }
+  };
+
+  return (
+    <Container maxWidth="xs">
+      <Box sx={{ 
+        mt: 8, 
+        display: 'flex', 
+        flexDirection: 'column', 
+        alignItems: 'center',
+        p: 4,
+        borderRadius: 2,
+        boxShadow: 3
+      }}>
+        <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }}>
+          <Lock color="primary" sx={{ fontSize: 40 }} />
+        </motion.div>
+        <Typography variant="h5" sx={{ mt: 2, mb: 2 }}>Login</Typography>
+        
+        {error && (
+          <Typography color="error" sx={{ mb: 2 }}>{error}</Typography>
+        )}
+        
+        <Box component="form" onSubmit={handleSubmit} sx={{ width: '100%' }}>
+          <TextField
+            margin="normal"
+            required
+            fullWidth
+            label="Email Address"
+            autoComplete="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            InputProps={{
+              startAdornment: <Email sx={{ color: 'action.active', mr: 1 }} />
+            }}
+          />
+          <TextField
+            margin="normal"
+            required
+            fullWidth
+            label="Password"
+            type="password"
+            autoComplete="current-password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            InputProps={{
+              startAdornment: <Lock sx={{ color: 'action.active', mr: 1 }} />
+            }}
+          />
+          <Button
+            type="submit"
+            fullWidth
+            variant="contained"
+            sx={{ mt: 3, mb: 2 }}
+            component={motion.button}
+            whileHover={{ scale: 1.02 }}
+          >
+            Sign In
+          </Button>
+        </Box>
+	<Link href="/signup" variant="body2" sx={{ mt: 2 }}>
+          Don't have an account? Sign Up
+        </Link>
+      </Box>
+    </Container>
+  );
+};
+
+export default Login;
