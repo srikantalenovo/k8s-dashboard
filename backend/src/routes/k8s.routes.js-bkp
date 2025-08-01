@@ -1,0 +1,71 @@
+import express from 'express';
+import { coreV1Api } from '../services/k8s.service.js';
+import { authenticate } from '../middleware/authenticate.js';
+
+const router = express.Router();
+
+
+// Get cluster nodes
+router.get('/nodes', authenticate, async (req, res) => {
+  try {
+    const response = await coreV1Api.listNode();
+    const nodes = response.body.items.map(node => ({
+      name: node.metadata.name,
+      status: node.status.conditions.find(c => c.type === 'Ready').status,
+      cpu: node.status.capacity?.cpu || 'N/A',
+      memory: node.status.capacity?.memory || 'N/A'
+    }));
+    res.json(nodes);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Get all pods
+router.get('/pods', authenticate, async (req, res) => {
+  try {
+    const response = await coreV1Api.listPodForAllNamespaces();
+    const pods = response.body.items.map(pod => ({
+      name: pod.metadata.name,
+      namespace: pod.metadata.namespace,
+      status: pod.status.phase,
+      node: pod.spec.nodeName
+    }));
+    res.json(pods);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Get cluster health
+router.get('/health', authenticate, async (req, res) => {
+  try {
+    const [nodes, pods] = await Promise.all([
+      k8sClient.listNode(),
+      k8sClient.listPodForAllNamespaces()
+    ]);
+    
+    const totalNodes = nodes.body.items.length;
+    const readyNodes = nodes.body.items.filter(
+      node => node.status.conditions.find(c => c.type === 'Ready').status === 'True'
+    ).length;
+    
+    const totalPods = pods.body.items.length;
+    const runningPods = pods.body.items.filter(
+      pod => pod.status.phase === 'Running'
+    ).length;
+    
+    res.json({
+      nodeHealth: Math.round((readyNodes / totalNodes) * 100),
+      podHealth: Math.round((runningPods / totalPods) * 100),
+      totalNodes,
+      readyNodes,
+      totalPods,
+      runningPods
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+export default router;
