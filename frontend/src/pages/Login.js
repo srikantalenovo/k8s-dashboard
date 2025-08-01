@@ -61,18 +61,30 @@ const Login = () => {
     if (error) setError('');
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    try {
-      await login({
-        email: formData.email,
-        password: formData.password
-      });
-    } catch (err) {
-      console.error('Login error:', err);
-    }
-  };
+//  const handleSubmit = async (e) => {
+//    e.preventDefault();
+//    try {
+//      await login({
+//        email: formData.email,
+//        password: formData.password
+//      });
+//    } catch (err) {
+//      console.error('Login error:', err);
+//    }
 
+const onSubmit = async (e) => {
+  e.preventDefault();
+  try {
+    await login(formData);
+   }  catch (err) {
+      setError(
+        err.response?.data?.message || 
+        err.response?.data?.error || 
+        'Login failed. Please try again.'
+    );
+  }
+};
+     
   const togglePasswordVisibility = () => {
     setFormData({
       ...formData,

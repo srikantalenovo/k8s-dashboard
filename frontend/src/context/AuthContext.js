@@ -26,7 +26,9 @@ export function AuthProvider({ children }) {
         email,
         password
       }, {
-        validateStatus: (status) => status < 500 // Consider 4xx as not errors
+	  headers: {
+	    'Content-Type': 'application/json'
+	  }
       });
 
       if (response.data.token && response.data.user) {
