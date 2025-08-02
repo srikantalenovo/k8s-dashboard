@@ -77,7 +77,7 @@ const Signup = () => {
         formData.username.trim(),  // Add trim()
         formData.email.trim(),     // Add trim()
         formData.password,
-        'viewer'                  // Default role for new users
+        formData.role || 'viewer'                  // Default role for new users
       );
     } catch (err) {
       setError(err.message || 'Signup failed. Please try again.');

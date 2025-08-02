@@ -1,95 +1,111 @@
 import jwt from 'jsonwebtoken';
 import User from '../models/user.model.js';
-import { UnauthorizedError, ConflictError } from '../utils/errors.js';
 
-/**
- * Login user
- */
-export const login = async (req, res, next) => {
+// 🔹 Default RBAC permissions based on role
+const getDefaultPermissions = (role) => {
+  const permissionsMap = {
+    admin: [{ resource: '*', actions: ['*'] }],
+    editor: [
+      { resource: 'dashboard', actions: ['read', 'edit'] },
+      { resource: 'content', actions: ['create', 'edit', 'delete'] },
+      { resource: 'nodes', actions: ['read'] },
+      { resource: 'logs', actions: ['read'] }
+    ],
+    viewer: [
+      { resource: 'dashboard', actions: ['read'] },
+      { resource: 'nodes', actions: ['read'] }
+    ]
+  };
+  return permissionsMap[role] || [];
+};
+
+export const login = async (req, res) => {
   try {
     const { email, password } = req.body;
-
-    // Ensure both fields are present
-    if (!email || !password) {
-      throw new UnauthorizedError('Email and password are required');
-    }
-
-    const user = await User.findByCredentials(email, password);
+    
+    const user = await User.findOne({ where: { email } });
     if (!user) {
-      throw new UnauthorizedError('Invalid email or password');
+      return res.status(401).json({ error: 'Invalid email or password' });
     }
+
+    const isMatch = await user.comparePassword(password);
+    if (!isMatch) {
+      return res.status(401).json({ error: 'Invalid email or password' });
+    }
+
+    // Ensure permissions are always present
+    const userPermissions = Array.isArray(user.permissions) && user.permissions.length > 0
+      ? user.permissions
+      : getDefaultPermissions(user.role);
 
     const token = jwt.sign(
       {
         userId: user.id,
         role: user.role,
-        permissions: user.permissions
+        permissions: userPermissions
       },
       process.env.JWT_SECRET,
       { expiresIn: '1h' }
     );
 
     res.json({
-      success: true,
       user: {
         id: user.id,
         username: user.username,
         email: user.email,
-        role: user.role
+        role: user.role,
+        permissions: userPermissions
       },
       token
     });
 
   } catch (error) {
-    next(error);
+    res.status(500).json({ error: 'Login failed' });
   }
 };
 
-/**
- * Signup user
- */
-export const signup = async (req, res, next) => {
+export const signup = async (req, res) => {
   try {
     const { username, email, password, role = 'viewer' } = req.body;
 
-    if (!username || !email || !password) {
-      throw new ConflictError('Username, email, and password are required');
-    }
-
     const existingUser = await User.findOne({ where: { email } });
     if (existingUser) {
-      throw new ConflictError('Email already exists');
+      return res.status(409).json({ error: 'Email already exists' });
     }
+
+    // Assign default permissions based on role
+    const defaultPermissions = getDefaultPermissions(role);
 
     const user = await User.create({
       username,
       email,
       password,
-      role
+      role,
+      permissions: defaultPermissions
     });
 
     const token = jwt.sign(
       {
         userId: user.id,
         role: user.role,
-        permissions: user.permissions
+        permissions: defaultPermissions
       },
       process.env.JWT_SECRET,
       { expiresIn: '1h' }
     );
 
     res.status(201).json({
-      success: true,
       user: {
         id: user.id,
         username: user.username,
         email: user.email,
-        role: user.role
+        role: user.role,
+        permissions: defaultPermissions
       },
       token
     });
 
   } catch (error) {
-    next(error);
+    res.status(500).json({ error: 'Registration failed' });
   }
 };

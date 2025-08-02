@@ -1,83 +1,76 @@
 import React, { createContext, useState, useContext, useEffect } from 'react';
-import axios from 'axios';
+import api from '../services/api';
 
 const AuthContext = createContext();
 
 export const AuthProvider = ({ children }) => {
-  const [user, setUser] = useState(null);
-  const [token, setToken] = useState(localStorage.getItem('token') || '');
+  const [user, setUser] = useState(() => {
+    const savedUser = localStorage.getItem('user');
+    return savedUser ? JSON.parse(savedUser) : null;
+  });
+  const [token, setToken] = useState(localStorage.getItem('token') || null);
   const [error, setError] = useState('');
 
-  const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
-
-  /**
-   * Login user
-   */
   const login = async (credentials) => {
     try {
-      const res = await axios.post(
-        `${API_URL}/api/auth/login`,
-        credentials,
-        { headers: { 'Content-Type': 'application/json' } }
-      );
+      const { data } = await api.post('/auth/login', credentials);
 
-      setUser(res.data.user);
-      setToken(res.data.token);
-      localStorage.setItem('token', res.data.token);
+      // 🔹 Ensure permissions always exist
+      const normalizedUser = {
+        id: data.user.id,
+        username: data.user.username,
+        email: data.user.email,
+        role: data.user.role,
+        permissions: data.user.permissions || [] // 🔹 FIX
+      };
+
+      setUser(normalizedUser);
+      setToken(data.token);
+      localStorage.setItem('user', JSON.stringify(normalizedUser));
+      localStorage.setItem('token', data.token);
       setError('');
-      return res.data;
     } catch (err) {
-     console.error('Login error:', err);
-     setError(
-       err.response?.data?.error?.message ||
-       err.response?.data?.error ||
-       'Login failed'
-     );
+      setError(err.response?.data?.error || 'Login failed');
       throw err;
     }
   };
 
-  /**
-   * Signup user
-   */
   const signup = async (credentials) => {
     try {
-      const res = await axios.post(
-        `${API_URL}/api/auth/signup`,
-        credentials,
-        { headers: { 'Content-Type': 'application/json' } }
-      );
+      const { data } = await api.post('/auth/signup', credentials);
 
-      setUser(res.data.user);
-      setToken(res.data.token);
-      localStorage.setItem('token', res.data.token);
+      // 🔹 Ensure permissions always exist
+      const normalizedUser = {
+        id: data.user.id,
+        username: data.user.username,
+        email: data.user.email,
+        role: data.user.role,
+        permissions: data.user.permissions || [] // 🔹 FIX
+      };
+
+      setUser(normalizedUser);
+      setToken(data.token);
+      localStorage.setItem('user', JSON.stringify(normalizedUser));
+      localStorage.setItem('token', data.token);
       setError('');
-      return res.data;
     } catch (err) {
-     console.error('Signup error:', err);
-     setError(
-       err.response?.data?.error?.message ||
-       err.response?.data?.error ||
-       'Signup failed'
-     );
+      setError(err.response?.data?.error || 'Signup failed');
       throw err;
     }
   };
 
-  /**
-   * Logout user
-   */
   const logout = () => {
     setUser(null);
-    setToken('');
+    setToken(null);
+    localStorage.removeItem('user');
     localStorage.removeItem('token');
   };
 
   useEffect(() => {
     if (token) {
-      axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+      api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
     } else {
-      delete axios.defaults.headers.common['Authorization'];
+      delete api.defaults.headers.common['Authorization'];
     }
   }, [token]);
 
