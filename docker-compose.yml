@@ -29,6 +29,8 @@ services:
       DB_PASSWORD: admin123
       DB_NAME: grepmind
       JWT_SECRET: ec846f9100f102b76ab9d31eb2d02c98b2aefa24e3fcb24784b9fdf4fb9a75c7fe361a3e6b12eb01d6eab38498b1d06cd6c761642dcdbd2b76e433179d761cb6
+      FRONTEND_URL: http://localhost:3000
+      DATABASE_URL: postgres://admin:admin123@localhost:5432/grepmind
     depends_on:
       - db
     networks:
@@ -36,6 +38,8 @@ services:
 
   frontend:
     build: ./frontend
+    environment:
+      - REACT_APP_API_URL=http://localhost:5000    
     ports:
       - "3000:80"
     depends_on:
@@ -47,4 +51,4 @@ volumes:
   postgres_data:
 networks:
   app-network:
-    driver: bridge    
+    driver: host    
