@@ -7,7 +7,7 @@ import {
   TableCell, TableContainer, TableHead, TableRow, Button, IconButton, Paper, Grid,
   Avatar, LinearProgress, styled, Container, useTheme, Popover,
   Dialog, DialogTitle, DialogContent, DialogActions, List,
-  ListItem, ListItemText, ListItemIcon
+  ListItem, ListItemText, ListItemIcon, Checkbox, FormControlLabel
 } from '@mui/material';
 import {
   Home as HomeIcon,
@@ -30,17 +30,32 @@ import {
   Visibility as VisibilityIcon
 } from '@mui/icons-material';
 import { motion } from 'framer-motion';
-import useK8sData from '../hooks/useK8sData';
 
-// ✅ RBAC helper for plain JSON user objects
-const hasPermission = (user, resource, action) => {
-  if (!user) return false;
-  if (user.role === 'admin') return true;
-  return user.permissions?.some(
-    perm =>
-      (perm.resource === resource || perm.resource === '*') &&
-      (perm.actions.includes(action) || perm.actions.includes('*'))
-  );
+// ✅ RBAC permission presets
+const PERMISSION_OPTIONS = [
+  { resource: 'pods', actions: ['read', 'delete'] },
+  { resource: 'nodes', actions: ['read'] },
+  { resource: 'deployments', actions: ['read', 'update'] },
+  { resource: 'logs', actions: ['read'] },
+  { resource: 'cluster', actions: ['read'] },
+  { resource: '*', actions: ['*'] }
+];
+
+// Role to default permissions mapping
+const ROLE_PRESETS = {
+  admin: [{ resource: '*', actions: ['*'] }],
+  editor: [
+    { resource: 'pods', actions: ['read', 'delete'] },
+    { resource: 'deployments', actions: ['read', 'update'] },
+    { resource: 'nodes', actions: ['read'] },
+    { resource: 'logs', actions: ['read'] }
+  ],
+  viewer: [
+    { resource: 'pods', actions: ['read'] },
+    { resource: 'deployments', actions: ['read'] },
+    { resource: 'nodes', actions: ['read'] },
+    { resource: 'logs', actions: ['read'] }
+  ]
 };
 
 // Gradient background styling
@@ -50,7 +65,6 @@ const GradientBox = styled(Box)(({ theme }) => ({
   padding: theme.spacing(3),
 }));
 
-// Animated Paper component
 const MotionPaper = ({ children }) => (
   <motion.div whileHover={{ y: -5 }}>
     <Paper sx={{
@@ -67,7 +81,7 @@ const MotionPaper = ({ children }) => (
   </motion.div>
 );
 
-// Header component with RBAC controls
+// Header with RBAC User Management
 const Header = ({ currentView, setCurrentView, handleLogout, currentUser }) => {
   const theme = useTheme();
   const [anchorEl, setAnchorEl] = useState(null);
@@ -75,13 +89,6 @@ const Header = ({ currentView, setCurrentView, handleLogout, currentUser }) => {
   const [selectedUser, setSelectedUser] = useState(null);
   const [roleDialogOpen, setRoleDialogOpen] = useState(false);
   const [currentRole, setCurrentRole] = useState('viewer');
-
-  const navItems = [
-    { name: 'Home', icon: <HomeIcon />, permission: null },
-    { name: 'Analyzer', icon: <AnalyticsIcon />, permission: ['analyzer', 'read'] },
-    { name: 'Resources', icon: <ResourcesIcon />, permission: ['nodes', 'read'] },
-    { name: 'Logs', icon: <LogsIcon />, permission: ['logs', 'read'] }
-  ].filter(item => !item.permission || hasPermission(currentUser, ...item.permission));
 
   const fetchUsers = async () => {
     try {
@@ -105,13 +112,14 @@ const Header = ({ currentView, setCurrentView, handleLogout, currentUser }) => {
 
   const handleRoleUpdate = async () => {
     try {
-      await api.put(`/admin/users/${selectedUser.id}/role`, {
-        role: currentRole
+      await api.put(`/admin/users/${selectedUser.id}/access`, {
+        role: currentRole,
+        permissions: selectedUser.permissions || []
       });
       fetchUsers();
       handleClose();
     } catch (error) {
-      console.error('Error updating role:', error);
+      console.error('Error updating access:', error);
     }
   };
 
@@ -120,6 +128,21 @@ const Header = ({ currentView, setCurrentView, handleLogout, currentUser }) => {
     setCurrentRole(user.role);
     setRoleDialogOpen(true);
   };
+
+  const handleRoleChange = (role) => {
+    setCurrentRole(role);
+    setSelectedUser((prev) => ({
+      ...prev,
+      permissions: ROLE_PRESETS[role] || []
+    }));
+  };
+
+  const navItems = [
+    { name: 'Home', icon: <HomeIcon />, permission: null },
+    { name: 'Analyzer', icon: <AnalyticsIcon />, permission: ['analyzer', 'read'] },
+    { name: 'Resources', icon: <ResourcesIcon />, permission: ['nodes', 'read'] },
+    { name: 'Logs', icon: <LogsIcon />, permission: ['logs', 'read'] }
+  ].filter(item => !item.permission || currentUser?.hasPermission(...item.permission));
 
   return (
     <Box sx={{
@@ -135,16 +158,8 @@ const Header = ({ currentView, setCurrentView, handleLogout, currentUser }) => {
     }}>
       {/* Logo */}
       <Box sx={{ display: 'flex', alignItems: 'center' }}>
-        <DashboardIcon sx={{
-          fontSize: 40,
-          color: 'white',
-          marginRight: theme.spacing(1)
-        }} />
-        <Typography variant="h5" sx={{
-          color: 'white',
-          fontWeight: 'bold',
-          fontFamily: '"Poppins", sans-serif'
-        }}>
+        <DashboardIcon sx={{ fontSize: 40, color: 'white', marginRight: theme.spacing(1) }} />
+        <Typography variant="h5" sx={{ color: 'white', fontWeight: 'bold', fontFamily: '"Poppins", sans-serif' }}>
           GrepMind
         </Typography>
       </Box>
@@ -159,10 +174,7 @@ const Header = ({ currentView, setCurrentView, handleLogout, currentUser }) => {
             sx={{
               color: currentView === item.name ? 'white' : 'rgba(255, 255, 255, 0.7)',
               backgroundColor: currentView === item.name ? 'rgba(255, 255, 255, 0.2)' : 'transparent',
-              '&:hover': {
-                backgroundColor: 'rgba(255, 255, 255, 0.15)',
-                color: 'white'
-              },
+              '&:hover': { backgroundColor: 'rgba(255, 255, 255, 0.15)', color: 'white' },
               borderRadius: '8px',
               textTransform: 'none',
               padding: theme.spacing(1, 2),
@@ -178,18 +190,111 @@ const Header = ({ currentView, setCurrentView, handleLogout, currentUser }) => {
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
         {currentUser?.role === 'admin' && (
           <>
-            <IconButton
-              onClick={handleUserIconClick}
-              sx={{
-                color: 'white',
-                backgroundColor: 'rgba(255, 255, 255, 0.1)',
-                '&:hover': { backgroundColor: 'rgba(255, 255, 255, 0.2)' }
-              }}
-            >
+            <IconButton onClick={handleUserIconClick} sx={{
+              color: 'white',
+              backgroundColor: 'rgba(255, 255, 255, 0.1)',
+              '&:hover': { backgroundColor: 'rgba(255, 255, 255, 0.2)' }
+            }}>
               <PeopleIcon />
             </IconButton>
 
-            {/* ... Admin popover & role dialog remain unchanged ... */}
+            <Popover
+              open={Boolean(anchorEl)}
+              anchorEl={anchorEl}
+              onClose={handleClose}
+              anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+              transformOrigin={{ vertical: 'top', horizontal: 'right' }}
+            >
+              <Box sx={{ p: 2, width: 350 }}>
+                <Typography variant="h6" gutterBottom>User Management</Typography>
+                <List>
+                  {users.map((user) => (
+                    <ListItem key={user.id} secondaryAction={
+                      <IconButton edge="end" onClick={() => openRoleDialog(user)}>
+                        <EditIcon />
+                      </IconButton>
+                    }>
+                      <ListItemIcon>
+                        {user.role === 'admin' ? <AdminPanelSettingsIcon /> :
+                          user.role === 'editor' ? <EditIcon /> : <VisibilityIcon />}
+                      </ListItemIcon>
+                      <ListItemText primary={user.username} secondary={`${user.role} - ${user.email}`} />
+                    </ListItem>
+                  ))}
+                </List>
+              </Box>
+            </Popover>
+
+            <Dialog open={roleDialogOpen} onClose={handleClose}>
+              <DialogTitle>Update User Role & Permissions</DialogTitle>
+              <DialogContent>
+                <Typography variant="subtitle1" gutterBottom>Editing: {selectedUser?.username}</Typography>
+                <Select
+                  fullWidth
+                  value={currentRole}
+                  onChange={(e) => handleRoleChange(e.target.value)}
+                  sx={{ mt: 2 }}
+                >
+                  <MenuItem value="admin">Admin (Full access)</MenuItem>
+                  <MenuItem value="editor">Editor (Read/Write)</MenuItem>
+                  <MenuItem value="viewer">Viewer (Read only)</MenuItem>
+                </Select>
+
+                {/* ✅ Permission Checkboxes */}
+                <Box sx={{ mt: 3 }}>
+                  <Typography variant="subtitle2" sx={{ mb: 1 }}>Permissions</Typography>
+                  {PERMISSION_OPTIONS.map((perm) => (
+                    <Box key={perm.resource} sx={{ mb: 1, pl: 1 }}>
+                      <Typography variant="body2" sx={{ fontWeight: 'bold' }}>
+                        {perm.resource}
+                      </Typography>
+                      {perm.actions.map((action) => {
+                        const checked = selectedUser?.permissions?.some(
+                          p => p.resource === perm.resource && p.actions.includes(action)
+                        );
+                        return (
+                          <FormControlLabel
+                            key={`${perm.resource}-${action}`}
+                            control={
+                              <Checkbox
+                                checked={checked}
+                                onChange={(e) => {
+                                  let newPermissions = [...(selectedUser?.permissions || [])];
+                                  if (e.target.checked) {
+                                    const existing = newPermissions.find(p => p.resource === perm.resource);
+                                    if (existing) {
+                                      if (!existing.actions.includes(action)) {
+                                        existing.actions.push(action);
+                                      }
+                                    } else {
+                                      newPermissions.push({ resource: perm.resource, actions: [action] });
+                                    }
+                                  } else {
+                                    newPermissions = newPermissions.map(p =>
+                                      p.resource === perm.resource
+                                        ? { ...p, actions: p.actions.filter(a => a !== action) }
+                                        : p
+                                    ).filter(p => p.actions.length > 0);
+                                  }
+                                  setSelectedUser({ ...selectedUser, permissions: newPermissions });
+                                }}
+                              />
+                            }
+                            label={action}
+                          />
+                        );
+                      })}
+                    </Box>
+                  ))}
+                </Box>
+              </DialogContent>
+              <DialogActions>
+                <Button onClick={handleClose}>Cancel</Button>
+                <Button variant="contained" onClick={handleRoleUpdate} color="primary">
+                  Update Role
+                </Button>
+              </DialogActions>
+            </Dialog>
           </>
         )}
 
@@ -202,16 +307,11 @@ const Header = ({ currentView, setCurrentView, handleLogout, currentUser }) => {
           padding: '4px 12px',
           marginRight: '8px'
         }}>
-          <Typography variant="body2" sx={{
-            color: 'white',
-            marginRight: '8px',
-            textTransform: 'capitalize'
-          }}>
+          <Typography variant="body2" sx={{ color: 'white', marginRight: '8px', textTransform: 'capitalize' }}>
             {currentUser?.role}
           </Typography>
           <Avatar sx={{
-            width: 32,
-            height: 32,
+            width: 32, height: 32,
             backgroundColor: currentUser?.role === 'admin' ? '#ff5722' :
               currentUser?.role === 'editor' ? '#4caf50' : '#2196f3'
           }}>
@@ -219,15 +319,11 @@ const Header = ({ currentView, setCurrentView, handleLogout, currentUser }) => {
           </Avatar>
         </Box>
 
-        {/* Sign Out */}
-        <IconButton
-          onClick={handleLogout}
-          sx={{
-            color: 'white',
-            backgroundColor: 'rgba(255, 255, 255, 0.1)',
-            '&:hover': { backgroundColor: 'rgba(255, 255, 255, 0.2)' }
-          }}
-        >
+        <IconButton onClick={handleLogout} sx={{
+          color: 'white',
+          backgroundColor: 'rgba(255, 255, 255, 0.1)',
+          '&:hover': { backgroundColor: 'rgba(255, 255, 255, 0.2)' }
+        }}>
           <SignOutIcon />
         </IconButton>
       </Box>
@@ -235,6 +331,7 @@ const Header = ({ currentView, setCurrentView, handleLogout, currentUser }) => {
   );
 };
 
+// View components
 const HomeView = () => (
   <Box>
     <Typography variant="h4" gutterBottom sx={{ color: 'white' }}>
@@ -262,7 +359,7 @@ const ResourcesView = ({ currentUser }) => {
   const [error, setError] = useState(null);
 
   const fetchData = async () => {
-    if (!hasPermission(currentUser, resourceType, 'read')) {
+    if (!currentUser?.hasPermission(resourceType, 'read')) {
       setError('You do not have permission to view this resource');
       setData([]);
       return;
@@ -274,7 +371,7 @@ const ResourcesView = ({ currentUser }) => {
       const response = await api.get(
         `/api/k8s/${resourceType}${resourceType === 'pods' ? `?namespace=${namespace}` : ''}`
       );
-      if (!response.data) throw new Error('No data received');
+
       const formattedData = Array.isArray(response.data) ? response.data : [response.data];
       setData(formattedData);
     } catch (err) {
@@ -305,13 +402,10 @@ const ResourcesView = ({ currentUser }) => {
               fullWidth
               value={resourceType}
               onChange={(e) => setResourceType(e.target.value)}
-              sx={{
-                color: 'white',
-                '& .MuiSelect-icon': { color: 'white' }
-              }}
+              sx={{ color: 'white', '& .MuiSelect-icon': { color: 'white' } }}
             >
               {Object.entries(resourceConfig)
-                .filter(([key]) => hasPermission(currentUser, key, 'read'))
+                .filter(([key]) => currentUser?.hasPermission(key, 'read'))
                 .map(([key, { icon, label }]) => (
                   <MenuItem key={key} value={key} sx={{ color: '#333' }}>
                     <Box display="flex" alignItems="center">
@@ -331,14 +425,11 @@ const ResourcesView = ({ currentUser }) => {
                 fullWidth
                 value={namespace}
                 onChange={(e) => setNamespace(e.target.value)}
-                sx={{
-                  color: 'white',
-                  '& .MuiSelect-icon': { color: 'white' }
-                }}
+                sx={{ color: 'white', '& .MuiSelect-icon': { color: 'white' } }}
               >
                 <MenuItem value="default">default</MenuItem>
                 <MenuItem value="kube-system">kube-system</MenuItem>
-                {hasPermission(currentUser, 'namespaces', 'read') && (
+                {currentUser?.hasPermission('namespaces', 'read') && (
                   <MenuItem value="all">All Namespaces</MenuItem>
                 )}
               </Select>
@@ -347,29 +438,26 @@ const ResourcesView = ({ currentUser }) => {
         )}
 
         <Grid item>
-          <IconButton
-            onClick={fetchData}
-            sx={{
-              color: 'white',
-              backgroundColor: 'rgba(255, 255, 255, 0.1)',
-              '&:hover': { backgroundColor: 'rgba(255, 255, 255, 0.2)' }
-            }}
-          >
+          <IconButton onClick={fetchData} sx={{
+            color: 'white',
+            backgroundColor: 'rgba(255, 255, 255, 0.1)',
+            '&:hover': { backgroundColor: 'rgba(255, 255, 255, 0.2)' }
+          }}>
             <RefreshIcon />
           </IconButton>
         </Grid>
       </Grid>
 
-      {loading && <LinearProgress sx={{ height: 2, mb: 3 }} />}
-      {error && <Typography color="error">{error}</Typography>}
+      {loading && <LinearProgress sx={{ height: 2, borderRadius: 5, mb: 3 }} />}
+      {error && <MotionPaper sx={{ p: 2, mb: 2 }}><Typography color="error">{error}</Typography></MotionPaper>}
 
       <MotionPaper>
         <TableContainer>
           <Table sx={{ minWidth: 650 }}>
             <TableHead>
-              <TableRow>
+              <TableRow sx={{ backgroundColor: 'rgba(255, 255, 255, 0.1)' }}>
                 {data[0] && Object.keys(data[0]).map((key) => (
-                  <TableCell key={key} sx={{ fontWeight: 'bold' }}>
+                  <TableCell key={key} sx={{ color: '#fff', fontWeight: 'bold' }}>
                     {key.toUpperCase()}
                   </TableCell>
                 ))}
@@ -377,9 +465,9 @@ const ResourcesView = ({ currentUser }) => {
             </TableHead>
             <TableBody>
               {data.map((item, index) => (
-                <TableRow key={index}>
+                <TableRow key={index} sx={{ '&:hover': { backgroundColor: 'rgba(255, 255, 255, 0.03)' } }}>
                   {Object.values(item).map((value, idx) => (
-                    <TableCell key={idx}>
+                    <TableCell key={idx} sx={{ color: 'rgba(255, 255, 255, 0.8)' }}>
                       {typeof value === 'object' ? JSON.stringify(value) : String(value)}
                     </TableCell>
                   ))}
@@ -405,10 +493,6 @@ const Dashboard = () => {
   const { user: currentUser, logout } = useAuth();
   const navigate = useNavigate();
   const [currentView, setCurrentView] = useState('Home');
-  const [clusterHealth] = useState(85);
-  const [cpuUsage] = useState(65);
-  const [memoryUsage] = useState(72);
-  const [storageUsage] = useState(45);
 
   const handleLogout = () => {
     logout();
@@ -418,9 +502,9 @@ const Dashboard = () => {
   const renderView = () => {
     switch (currentView) {
       case 'Home': return <HomeView />;
-      case 'Analyzer': return hasPermission(currentUser, 'analyzer', 'read') ? <AnalyzerView /> : <HomeView />;
-      case 'Resources': return hasPermission(currentUser, 'nodes', 'read') ? <ResourcesView currentUser={currentUser} /> : <HomeView />;
-      case 'Logs': return hasPermission(currentUser, 'logs', 'read') ? <LogsView /> : <HomeView />;
+      case 'Analyzer': return currentUser?.hasPermission('analyzer', 'read') ? <AnalyzerView /> : <HomeView />;
+      case 'Resources': return currentUser?.hasPermission('nodes', 'read') ? <ResourcesView currentUser={currentUser} /> : <HomeView />;
+      case 'Logs': return currentUser?.hasPermission('logs', 'read') ? <LogsView /> : <HomeView />;
       default: return <HomeView />;
     }
   };
@@ -435,38 +519,6 @@ const Dashboard = () => {
           currentUser={currentUser}
         />
         {renderView()}
-        {currentView === 'Home' && (
-          <Grid container spacing={3} sx={{ mt: 2 }}>
-            {hasPermission(currentUser, 'cluster', 'read') && (
-              <Grid item xs={12} md={6} lg={3}>
-                <MotionPaper>
-                  <Typography variant="h6">Cluster Health</Typography>
-                </MotionPaper>
-              </Grid>
-            )}
-            {hasPermission(currentUser, 'metrics', 'read') && (
-              <Grid item xs={12} md={6} lg={3}>
-                <MotionPaper>
-                  <Typography variant="h6">CPU Usage</Typography>
-                </MotionPaper>
-              </Grid>
-            )}
-            {hasPermission(currentUser, 'metrics', 'read') && (
-              <Grid item xs={12} md={6} lg={3}>
-                <MotionPaper>
-                  <Typography variant="h6">Memory Usage</Typography>
-                </MotionPaper>
-              </Grid>
-            )}
-            {hasPermission(currentUser, 'storage', 'read') && (
-              <Grid item xs={12} md={6} lg={3}>
-                <MotionPaper>
-                  <Typography variant="h6">Storage Usage</Typography>
-                </MotionPaper>
-              </Grid>
-            )}
-          </Grid>
-        )}
       </Container>
     </GradientBox>
   );

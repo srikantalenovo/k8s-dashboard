@@ -1,20 +1,28 @@
 import express from 'express';
-import { authorize } from '../middleware/rbac.js';
-import {
-  getAllUsers,
-  updateUserRole,
-  deleteUser
-} from '../controllers/admin.controller.js';
+import { getAllUsers, updateUserAccess } from '../controllers/admin.controller.js';
+import { authenticateToken } from '../middleware/auth.middleware.js';
+import { authorizeRoles } from '../middleware/rbac.middleware.js';
+
+import { updateUserAccess } from '../controllers/admin.controller.js';
+import { authenticate, authorize } from '../middleware/auth.middleware.js';
 
 const router = express.Router();
 
-// Get all users — Admin only
-router.get('/users', authorize(['admin']), getAllUsers);
+// Only admins can access these routes
+router.use(authenticateToken, authorizeRoles('admin'));
 
-// Update user role — Admin only
-router.put('/users/:id/role', authorize(['admin']), updateUserRole);
+// GET all users
+router.get('/users', getAllUsers);
 
-// Delete user — Admin only
-router.delete('/users/:id', authorize(['admin']), deleteUser);
+// Update user role & permissions
+router.put('/users/:id/access', updateUserAccess);
+
+// 🔹 NEW: Update user role & permissions
+router.put(
+  '/users/:id/access',
+  authenticate,
+  authorize('admin', 'access'),
+  updateUserAccess
+);
 
 export default router;
