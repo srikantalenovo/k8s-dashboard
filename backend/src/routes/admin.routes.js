@@ -1,19 +1,15 @@
 import express from 'express';
-import { 
-  getAllUsers, 
-  updateUserRole,
-  getUserPermissions 
-} from '../controllers/auth.controller.js';
-import { validateToken } from '../middleware/validate.js';
+import { authenticate } from '../middleware/auth.js';
+import { checkPermission } from '../middleware/rbac.js';
+import { getAdminDashboard } from '../controllers/admin.controller.js';
 
 const router = express.Router();
 
-// Apply auth middleware to all admin routes
-router.use(validateToken);
-
-// User management routes
-router.get('/users', getAllUsers);
-router.put('/users/:userId/role', updateUserRole);
-router.get('/users/permissions', getUserPermissions);
+// Protected admin route with RBAC
+router.get('/dashboard',
+  authenticate,       // First verify JWT
+  checkPermission('admin', 'access'),  // Then check permissions
+  getAdminDashboard   // Finally execute controller
+);
 
 export default router;

@@ -12,7 +12,7 @@ RUN npm install
 COPY . .
 
 # Install any additional production dependencies
-RUN npm install helmet morgan cors express-validator @kubernetes/client-node jsonwebtoken
+RUN npm install helmet morgan cors express-validator @kubernetes/client-node jsonwebtoken express-validator
 
 ENV NODE_ENV=production
 ENV PORT=5000

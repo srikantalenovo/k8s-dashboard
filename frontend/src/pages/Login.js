@@ -65,7 +65,7 @@ const Login = () => {
     e.preventDefault();
     try {
       await login({
-        email: formData.email,
+        email: formData.email.trim(),  // Add trim() here
         password: formData.password
       });
     } catch (err) {

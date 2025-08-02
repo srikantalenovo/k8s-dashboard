@@ -1,118 +1,95 @@
-import { createContext, useContext, useState, useCallback, useEffect } from 'react';
+import { createContext, useContext, useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 
 const AuthContext = createContext();
 
 export function AuthProvider({ children }) {
-  const [token, setToken] = useState(() => localStorage.getItem('token'));
-  const [currentUser, setCurrentUser] = useState(null); // Added user state
-  const [error, setError] = useState(null);
-  const navigate = useNavigate();
+    const [user, setUser] = useState(null);
+    const [token, setToken] = useState(localStorage.getItem('token'));
+    const [error, setError] = useState(null);
+    const navigate = useNavigate();
 
-  // Clear auth state helper
-  const clearAuth = useCallback(() => {
-    localStorage.removeItem('token');
-    setToken(null);
-    setCurrentUser(null);
-    setError(null);
-  }, []);
-
-  const signup = async (username, email, password) => {
-    try {
-      setError(null);
-      const response = await axios.post('http://localhost:5000/api/auth/signup', {
-        username,
-        email,
-        password
-      }, {
-        validateStatus: (status) => status < 500 // Consider 4xx as not errors
-      });
-
-      if (response.data.token && response.data.user) {
-        localStorage.setItem('token', response.data.token);
-        setToken(response.data.token);
-        setCurrentUser(response.data.user); // Store user data
-        navigate('/dashboard');
-      } else {
-        throw new Error('Invalid response format from server');
-      }
-    } catch (err) {
-      const errorMessage = err.response?.data?.message || 
-                         err.message || 
-                         'Registration failed. Please try again.';
-      setError(errorMessage);
-      clearAuth(); // Clear any partial auth state
-      throw new Error(errorMessage);
-    }
-  };
-
-const login = async (email, password) => {
-  try {
-    const response = await axios.post(
-      `${process.env.REACT_APP_API_URL}/api/auth/login`,
-      { email, password },
-      {
-        headers: { 'Content-Type': 'application/json' }
-      }
-    );
-
-    if (response.data.token && response.data.user) {
-      localStorage.setItem('token', response.data.token);
-      setToken(response.data.token);
-      setCurrentUser(response.data.user);
-      navigate('/dashboard');
-    } else {
-      throw new Error('Authentication failed');
-    }
-  } catch (error) {
-    setError(error.response?.data?.error || error.message);
-    throw error;
-  }
-};
-
-  const logout = useCallback(() => {
-    clearAuth();
-    navigate('/login');
-  }, [clearAuth, navigate]);
-
-  // Verify token on initial load
-  useEffect(() => {
-    const verifyToken = async () => {
-      if (token) {
-        try {
-          const response = await axios.get('http://localhost:5000/api/auth/verify', {
-            headers: { Authorization: `Bearer ${token}` }
-          });
-          setCurrentUser(response.data.user);
-        } catch (err) {
-          clearAuth();
+    // Set auth headers
+    useEffect(() => {
+        if (token) {
+            axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+        } else {
+            delete axios.defaults.headers.common['Authorization'];
         }
-      }
-    };
-    verifyToken();
-  }, [token, clearAuth]);
+    }, [token]);
 
-  return (
-    <AuthContext.Provider value={{ 
-      token, 
-      currentUser, // Expose user data
-      isAuthenticated: !!token, // Convenience boolean
-      signup, 
-      login, 
-      logout, 
-      error, 
-      setError 
-    }}>
-      {children}
-    </AuthContext.Provider>
-  );
+    // Verify token on mount
+    useEffect(() => {
+        const verifyToken = async () => {
+            if (!token) return;
+            
+            try {
+                const res = await axios.get('/api/auth/verify');
+                setUser(res.data.user);
+            } catch (err) {
+                logout();
+            }
+        };
+        verifyToken();
+    }, [token]);
+
+    const login = async (credentials) => {
+        try {
+            setError(null);
+            const { data } = await axios.post('/api/auth/login', credentials);
+            
+            localStorage.setItem('token', data.token);
+            setToken(data.token);
+            setUser(data.user);
+            navigate('/dashboard');
+            
+        } catch (err) {
+            setError(err.response?.data?.error || 'Login failed');
+            throw err;
+        }
+    };
+
+    const signup = async (userData) => {
+        try {
+            setError(null);
+            const { data } = await axios.post('/api/auth/signup', userData);
+            
+            localStorage.setItem('token', data.token);
+            setToken(data.token);
+            setUser(data.user);
+            navigate('/dashboard');
+            
+        } catch (err) {
+            setError(err.response?.data?.error || 'Registration failed');
+            throw err;
+        }
+    };
+
+    const logout = () => {
+        localStorage.removeItem('token');
+        setToken(null);
+        setUser(null);
+        navigate('/login');
+    };
+
+    return (
+        <AuthContext.Provider
+            value={{
+                user,
+                token,
+                error,
+                login,
+                signup,
+                logout,
+                isAuthenticated: !!token
+            }}
+        >
+            {children}
+        </AuthContext.Provider>
+    );
 }
 
 export function useAuth() {
-  const context = useContext(AuthContext);
-  if (!context) {
-    throw new Error('useAuth must be used within an AuthProvider');
-  }
-  return context;
+    return useContext(AuthContext);
 }

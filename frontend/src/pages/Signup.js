@@ -74,12 +74,13 @@ const Signup = () => {
 
     try {
       await signup(
-        formData.username.trim(),
-        formData.email.trim(),
-        formData.password
+        formData.username.trim(),  // Add trim()
+        formData.email.trim(),     // Add trim()
+        formData.password,
+        'viewer'                  // Default role for new users
       );
     } catch (err) {
-      setError(err.response?.data?.message || 'Signup failed. Please try again.');
+      setError(err.message || 'Signup failed. Please try again.');
     }
   };
 
