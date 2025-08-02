@@ -2,7 +2,8 @@ import { DataTypes } from 'sequelize';
 import { sequelize } from '../utils/database.js';
 import bcrypt from 'bcrypt';
 
-const User = sequelize.define('User', {
+// Define the model
+const UserModel = sequelize.define('User', {
   id: {
     type: DataTypes.INTEGER,
     primaryKey: true,
@@ -34,6 +35,10 @@ const User = sequelize.define('User', {
   role: {
     type: DataTypes.ENUM('admin', 'editor', 'viewer'),
     defaultValue: 'viewer'
+  },
+  permissions: {
+    type: DataTypes.JSONB,
+    defaultValue: []
   }
 }, {
   hooks: {
@@ -42,36 +47,55 @@ const User = sequelize.define('User', {
         const salt = await bcrypt.genSalt(10);
         user.password = await bcrypt.hash(user.password, salt);
       }
+      if (!user.permissions) {
+        user.permissions = getDefaultPermissions(user.role);
+      }
     },
     beforeUpdate: async (user) => {
       if (user.changed('password')) {
         const salt = await bcrypt.genSalt(10);
         user.password = await bcrypt.hash(user.password, salt);
       }
+      if (user.changed('role') && !user.changed('permissions')) {
+        user.permissions = getDefaultPermissions(user.role);
+      }
     }
   },
   timestamps: true
 });
 
-// Instance method for password comparison
-User.prototype.comparePassword = async function(candidatePassword) {
+// Helper function
+function getDefaultPermissions(role) {
+  const permissions = {
+    admin: [{ resource: '*', actions: ['*'] }],
+    editor: [
+      { resource: 'dashboard', actions: ['read', 'edit'] },
+      { resource: 'content', actions: ['create', 'edit', 'delete'] }
+    ],
+    viewer: [
+      { resource: 'dashboard', actions: ['read'] },
+      { resource: 'content', actions: ['read'] }
+    ]
+  };
+  return permissions[role] || [];
+}
+
+// Add methods
+UserModel.prototype.comparePassword = async function(candidatePassword) {
   return await bcrypt.compare(candidatePassword, this.password);
 };
 
-// Static method for credentials check
-User.findByCredentials = async (email, password) => {
-  const user = await User.findOne({ where: { email } });
-  if (!user) throw new Error('Invalid credentials');
-  
-  const isMatch = await user.comparePassword(password);
-  if (!isMatch) throw new Error('Invalid credentials');
-
-  return user;
+UserModel.prototype.hasPermission = function(resource, action) {
+  if (this.role === 'admin') return true;
+  return this.permissions.some(perm => 
+    (perm.resource === resource || perm.resource === '*') &&
+    (perm.actions.includes(action) || perm.actions.includes('*'))
+  );
 };
 
-// Initialize default admin
-User.initAdmin = async () => {
-  const [admin] = await User.findOrCreate({
+// Initialize admin
+UserModel.initAdmin = async () => {
+  const [admin] = await UserModel.findOrCreate({
     where: { email: 'admin@example.com' },
     defaults: {
       username: 'admin',
@@ -82,4 +106,5 @@ User.initAdmin = async () => {
   return admin;
 };
 
-export default User;
+// Named export
+export const User = UserModel;

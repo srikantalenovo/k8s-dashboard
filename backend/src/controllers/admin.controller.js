@@ -3,9 +3,13 @@ import { ForbiddenError } from '../utils/errors.js';
 
 export const getAdminDashboard = async (req, res) => {
     try {
-        // Example admin-only operation
+        // Verify admin permissions again (redundant check for security)
+        if (!req.user.hasPermission('admin', 'access')) {
+            throw new ForbiddenError('Insufficient permissions');
+        }
+
         const users = await User.findAll({
-            attributes: ['id', 'username', 'email', 'role'],
+            attributes: ['id', 'username', 'email', 'role', 'createdAt'],
             order: [['createdAt', 'DESC']],
             limit: 100
         });
@@ -15,17 +19,15 @@ export const getAdminDashboard = async (req, res) => {
             data: {
                 users,
                 stats: {
-                    totalUsers: users.length,
-                    // Add other admin stats here
+                    totalUsers: await User.count(),
+                    activeUsers: await User.count({ where: { isActive: true } }),
+                    adminCount: await User.count({ where: { role: 'admin' } })
                 }
             }
         });
 
     } catch (error) {
-        throw new ForbiddenError('Admin dashboard access failed');
+        console.error('Admin dashboard error:', error);
+        throw error; // Let the error handler deal with it
     }
 };
-
-// Add more admin controllers as needed
-export const adminAction1 = async (req, res) => { /* ... */ };
-export const adminAction2 = async (req, res) => { /* ... */ };
