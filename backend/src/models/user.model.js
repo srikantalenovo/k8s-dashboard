@@ -81,11 +81,11 @@ function getDefaultPermissions(role) {
 }
 
 // Add methods
-UserModel.prototype.comparePassword = async function(candidatePassword) {
+User.prototype.comparePassword = async function(candidatePassword) {
   return await bcrypt.compare(candidatePassword, this.password);
 };
 
-UserModel.prototype.hasPermission = function(resource, action) {
+User.prototype.hasPermission = function(resource, action) {
   if (this.role === 'admin') return true;
   return this.permissions.some(perm => 
     (perm.resource === resource || perm.resource === '*') &&
@@ -94,7 +94,7 @@ UserModel.prototype.hasPermission = function(resource, action) {
 };
 
 // Initialize admin
-UserModel.initAdmin = async () => {
+User.initAdmin = async () => {
   const [admin] = await UserModel.findOrCreate({
     where: { email: 'admin@example.com' },
     defaults: {
