@@ -31,9 +31,13 @@ const User = sequelize.define('User', {
       len: [8, 255]
     }
   },
+  // ✅ Keep STRING in Sequelize but validate as ENUM
   role: {
-    type: DataTypes.ENUM('admin', 'editor', 'viewer'),
-    defaultValue: 'viewer'
+    type: DataTypes.STRING,
+    defaultValue: 'viewer',
+    validate: {
+      isIn: [['admin', 'editor', 'viewer']]
+    }
   },
   permissions: {
     type: DataTypes.JSONB,
@@ -47,8 +51,8 @@ const User = sequelize.define('User', {
     defaultValue: true
   }
 }, {
-  tableName: 'users',        // ✅ Force lowercase table name
-  freezeTableName: true,     // ✅ Prevent Sequelize from pluralizing
+  tableName: 'users',        // ✅ Matches init.sql lowercase table
+  freezeTableName: true,
   timestamps: true,
   hooks: {
     beforeCreate: async (user) => {
@@ -72,7 +76,7 @@ const User = sequelize.define('User', {
   }
 });
 
-// Helper function
+// Default permissions by role
 function getDefaultPermissions(role) {
   const permissions = {
     admin: [{ resource: '*', actions: ['*'] }],
@@ -108,6 +112,11 @@ User.findByCredentials = async (email, password) => {
   if (!user) throw new Error('Invalid email or password');
   const isMatch = await user.comparePassword(password);
   if (!isMatch) throw new Error('Invalid email or password');
+
+  // ✅ Update last login on successful auth
+  user.lastLogin = new Date();
+  await user.save();
+
   return user;
 };
 

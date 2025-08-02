@@ -1,35 +1,20 @@
 import express from 'express';
-// import { 
-//     getAdminDashboard,
-//     adminAction1,
-//     adminAction2
-// } from '../controllers/admin.controller.js';
-
-import { getAdminDashboard } from '../controllers/admin.controller.js';
-import { authenticate } from '../middleware/auth.js';
-import { checkPermission } from '../middleware/rbac.js';
+import { authorize } from '../middleware/rbac.js';
+import {
+  getAllUsers,
+  updateUserRole,
+  deleteUser
+} from '../controllers/admin.controller.js';
 
 const router = express.Router();
 
-// Admin dashboard route
-router.get('/dashboard',
-    authenticate,
-    checkPermission('admin', 'access'),
-    getAdminDashboard
-);
+// Get all users — Admin only
+router.get('/users', authorize(['admin']), getAllUsers);
 
-// // Example protected admin action
-// router.post('/action1',
-//     authenticate,
-//     checkPermission('admin', 'manage'),
-//     adminAction1
-// );
+// Update user role — Admin only
+router.put('/users/:id/role', authorize(['admin']), updateUserRole);
 
-// // Another protected action
-// router.delete('/action2/:id',
-//     authenticate,
-//     checkPermission('admin', 'delete'),
-//     adminAction2
-// );
+// Delete user — Admin only
+router.delete('/users/:id', authorize(['admin']), deleteUser);
 
 export default router;

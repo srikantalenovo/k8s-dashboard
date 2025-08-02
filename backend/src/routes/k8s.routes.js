@@ -1,26 +1,32 @@
 import express from 'express';
-import { validateToken } from '../middleware/validate.js';
-import { checkPermission } from '../middleware/rbac.js';
+import { authorize } from '../middleware/rbac.js';
 import {
-  getNodes,
-  getNamespaces,
+  getClusterInfo,
   getPods,
-  getDeployments,
-  getPodMetrics
+  deletePod,
+  restartPod
 } from '../controllers/k8s.controller.js';
 
 const router = express.Router();
 
-// Apply auth middleware to all k8s routes
-router.use(validateToken);
+// View cluster info — all roles
+router.get('/cluster-info', authorize(['admin', 'editor', 'viewer']), getClusterInfo);
 
-// Kubernetes API endpoints with RBAC checks
-router.get('/nodes', checkPermission('nodes', 'read'), getNodes);
-router.get('/namespaces', checkPermission('namespaces', 'read'), getNamespaces);
-router.get('/pods', checkPermission('pods', 'read'), getPods);
-router.get('/pods/:namespace', checkPermission('pods', 'read'), getPods);
-router.get('/deployments', checkPermission('deployments', 'read'), getDeployments);
-router.get('/deployments/:namespace', checkPermission('deployments', 'read'), getDeployments);
-router.get('/pods/:namespace/:name/metrics', checkPermission('pods', 'read'), getPodMetrics);
+// View pods — all roles
+router.get('/pods', authorize(['admin', 'editor', 'viewer']), getPods);
+
+// Delete pod — Admin & Editor with delete permission
+router.delete(
+  '/pods/:name',
+  authorize(['admin', 'editor'], { resource: 'k8s', action: 'delete' }),
+  deletePod
+);
+
+// Restart pod — Admin & Editor with edit permission
+router.post(
+  '/pods/:name/restart',
+  authorize(['admin', 'editor'], { resource: 'k8s', action: 'edit' }),
+  restartPod
+);
 
 export default router;
