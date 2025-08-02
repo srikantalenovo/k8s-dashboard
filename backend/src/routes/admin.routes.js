@@ -2,9 +2,8 @@ import express from 'express';
 import { getAllUsers, updateUserAccess } from '../controllers/admin.controller.js';
 import { authenticateToken } from '../middleware/auth.middleware.js';
 import { authorizeRoles } from '../middleware/rbac.middleware.js';
-
-import { updateUserAccess } from '../controllers/admin.controller.js';
 import { authenticate, authorize } from '../middleware/auth.middleware.js';
+
 
 const router = express.Router();
 
