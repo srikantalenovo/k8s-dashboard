@@ -31,31 +31,9 @@ const User = sequelize.define('User', {
       len: [8, 255]
     }
   },
-  lastLogin: {
-    type: DataTypes.DATE,
-    allowNull: true
-  },
-  isActive: {
-    type: DataTypes.BOOLEAN,
-    defaultValue: true
-  },
   role: {
     type: DataTypes.ENUM('admin', 'editor', 'viewer'),
     defaultValue: 'viewer'
-  },
-  permissions: {
-    type: DataTypes.JSONB,
-    defaultValue: []
-  },
-  createdAt: {
-    type: DataTypes.DATE,
-    allowNull: false,
-    defaultValue: DataTypes.NOW
-  },
-  updatedAt: {
-    type: DataTypes.DATE,
-    allowNull: false,
-    defaultValue: DataTypes.NOW
   }
 }, {
   hooks: {
@@ -64,73 +42,44 @@ const User = sequelize.define('User', {
         const salt = await bcrypt.genSalt(10);
         user.password = await bcrypt.hash(user.password, salt);
       }
-      // Set default permissions based on role
-      if (!user.permissions) {
-        user.permissions = getDefaultPermissions(user.role);
-      }
     },
     beforeUpdate: async (user) => {
       if (user.changed('password')) {
         const salt = await bcrypt.genSalt(10);
         user.password = await bcrypt.hash(user.password, salt);
       }
-      // Update permissions if role changed
-      if (user.changed('role') && !user.changed('permissions')) {
-        user.permissions = getDefaultPermissions(user.role);
-      }
     }
   },
-  timestamps: true,
-  underscored: false
+  timestamps: true
 });
 
-// Default permissions for each role
-function getDefaultPermissions(role) {
-  const defaults = {
-    admin: [
-      { resource: '*', actions: ['*'] }
-    ],
-    editor: [
-      { resource: 'nodes', actions: ['read'] },
-      { resource: 'pods', actions: ['read', 'create', 'delete'] },
-      { resource: 'deployments', actions: ['read', 'create', 'update'] }
-    ],
-    viewer: [
-      { resource: 'nodes', actions: ['read'] },
-      { resource: 'pods', actions: ['read'] },
-      { resource: 'deployments', actions: ['read'] }
-    ]
-  };
-  return defaults[role] || [];
-}
-
-// Password comparison method
+// Instance method for password comparison
 User.prototype.comparePassword = async function(candidatePassword) {
   return await bcrypt.compare(candidatePassword, this.password);
 };
 
-// Check if user has permission
-User.prototype.hasPermission = function(resource, action) {
-  if (this.role === 'admin') return true;
+// Static method for credentials check
+User.findByCredentials = async (email, password) => {
+  const user = await User.findOne({ where: { email } });
+  if (!user) throw new Error('Invalid credentials');
   
-  return this.permissions.some(perm => {
-    return (perm.resource === resource || perm.resource === '*') &&
-           (perm.actions.includes(action) || perm.actions.includes('*'));
-  });
+  const isMatch = await user.comparePassword(password);
+  if (!isMatch) throw new Error('Invalid credentials');
+
+  return user;
 };
 
-// Create default admin user
-User.createDefaultAdmin = async function() {
-  const admin = await this.findOne({ where: { username: 'admin' } });
-  if (!admin) {
-    await this.create({
+// Initialize default admin
+User.initAdmin = async () => {
+  const [admin] = await User.findOrCreate({
+    where: { email: 'admin@example.com' },
+    defaults: {
       username: 'admin',
-      email: 'admin@example.com',
-      password: 'Admin@123', // In production, use environment variables
+      password: 'Admin@123',
       role: 'admin'
-    });
-    console.log('Default admin user created');
-  }
+    }
+  });
+  return admin;
 };
 
 export default User;

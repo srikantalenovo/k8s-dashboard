@@ -47,30 +47,29 @@ export function AuthProvider({ children }) {
     }
   };
 
-  const login = async (formData) => {
-    try {
-      setError(null);
-      const response = await axios.post('http://localhost:5000/api/auth/login', formData, {
-        validateStatus: (status) => status < 500
-      });
-
-      if (response.data.token && response.data.user) {
-        localStorage.setItem('token', response.data.token);
-        setToken(response.data.token);
-        setCurrentUser(response.data.user); // Store user data
-        navigate('/dashboard');
-      } else {
-        throw new Error('Invalid response format from server');
+const login = async (email, password) => {
+  try {
+    const response = await axios.post(
+      `${process.env.REACT_APP_API_URL}/api/auth/login`,
+      { email, password },
+      {
+        headers: { 'Content-Type': 'application/json' }
       }
-    } catch (err) {
-      const errorMessage = err.response?.data?.message || 
-                         err.message || 
-                         'Login failed. Please check your credentials.';
-      setError(errorMessage);
-      clearAuth(); // Clear any partial auth state
-      throw new Error(errorMessage);
+    );
+
+    if (response.data.token && response.data.user) {
+      localStorage.setItem('token', response.data.token);
+      setToken(response.data.token);
+      setCurrentUser(response.data.user);
+      navigate('/dashboard');
+    } else {
+      throw new Error('Authentication failed');
     }
-  };
+  } catch (error) {
+    setError(error.response?.data?.error || error.message);
+    throw error;
+  }
+};
 
   const logout = useCallback(() => {
     clearAuth();

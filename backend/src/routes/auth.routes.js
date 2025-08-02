@@ -1,20 +1,14 @@
 import express from 'express';
-import { signup, login } from '../controllers/auth.controller.js';
-import { signupRules, loginRules, validate } from '../middleware/validate.js';
+import { signup, login, verifyToken } from '../controllers/auth.controller.js';
+import authenticate from '../middleware/authenticate.js';
 
 const router = express.Router();
 
-// Apply validation middleware to routes
-router.post('/signup', 
-  signupRules(),
-  validate,
-  signup
-);
+// Public routes
+router.post('/signup', signup);
+router.post('/login', login);
 
-router.post('/login',
-  loginRules(),
-  validate,
-  login
-);
+// Protected route
+router.get('/verify', authenticate, verifyToken);
 
 export default router;
