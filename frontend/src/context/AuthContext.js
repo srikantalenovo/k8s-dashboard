@@ -1,95 +1,91 @@
-import { createContext, useContext, useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { createContext, useState, useContext, useEffect } from 'react';
 import axios from 'axios';
 
 const AuthContext = createContext();
 
-export function AuthProvider({ children }) {
-    const [user, setUser] = useState(null);
-    const [token, setToken] = useState(localStorage.getItem('token'));
-    const [error, setError] = useState(null);
-    const navigate = useNavigate();
+export const AuthProvider = ({ children }) => {
+  const [user, setUser] = useState(null);
+  const [token, setToken] = useState(localStorage.getItem('token') || '');
+  const [error, setError] = useState('');
 
-    // Set auth headers
-    useEffect(() => {
-        if (token) {
-            axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-        } else {
-            delete axios.defaults.headers.common['Authorization'];
-        }
-    }, [token]);
+  const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
 
-    // Verify token on mount
-    useEffect(() => {
-        const verifyToken = async () => {
-            if (!token) return;
-            
-            try {
-                const res = await axios.get('/api/auth/verify');
-                setUser(res.data.user);
-            } catch (err) {
-                logout();
-            }
-        };
-        verifyToken();
-    }, [token]);
+  /**
+   * Login user
+   */
+  const login = async (credentials) => {
+    try {
+      const res = await axios.post(
+        `${API_URL}/api/auth/login`,
+        credentials,
+        { headers: { 'Content-Type': 'application/json' } }
+      );
 
-    const login = async (credentials) => {
-        try {
-            setError(null);
-            const { data } = await axios.post('/api/auth/login', credentials);
-            
-            localStorage.setItem('token', data.token);
-            setToken(data.token);
-            setUser(data.user);
-            navigate('/dashboard');
-            
-        } catch (err) {
-            setError(err.response?.data?.error || 'Login failed');
-            throw err;
-        }
-    };
+      setUser(res.data.user);
+      setToken(res.data.token);
+      localStorage.setItem('token', res.data.token);
+      setError('');
+      return res.data;
+    } catch (err) {
+     console.error('Login error:', err);
+     setError(
+       err.response?.data?.error?.message ||
+       err.response?.data?.error ||
+       'Login failed'
+     );
+      throw err;
+    }
+  };
 
-    const signup = async (userData) => {
-        try {
-            setError(null);
-            const { data } = await axios.post('/api/auth/signup', userData);
-            
-            localStorage.setItem('token', data.token);
-            setToken(data.token);
-            setUser(data.user);
-            navigate('/dashboard');
-            
-        } catch (err) {
-            setError(err.response?.data?.error || 'Registration failed');
-            throw err;
-        }
-    };
+  /**
+   * Signup user
+   */
+  const signup = async (credentials) => {
+    try {
+      const res = await axios.post(
+        `${API_URL}/api/auth/signup`,
+        credentials,
+        { headers: { 'Content-Type': 'application/json' } }
+      );
 
-    const logout = () => {
-        localStorage.removeItem('token');
-        setToken(null);
-        setUser(null);
-        navigate('/login');
-    };
+      setUser(res.data.user);
+      setToken(res.data.token);
+      localStorage.setItem('token', res.data.token);
+      setError('');
+      return res.data;
+    } catch (err) {
+     console.error('Signup error:', err);
+     setError(
+       err.response?.data?.error?.message ||
+       err.response?.data?.error ||
+       'Signup failed'
+     );
+      throw err;
+    }
+  };
 
-    return (
-        <AuthContext.Provider
-            value={{
-                user,
-                token,
-                error,
-                login,
-                signup,
-                logout,
-                isAuthenticated: !!token
-            }}
-        >
-            {children}
-        </AuthContext.Provider>
-    );
-}
+  /**
+   * Logout user
+   */
+  const logout = () => {
+    setUser(null);
+    setToken('');
+    localStorage.removeItem('token');
+  };
 
-export function useAuth() {
-    return useContext(AuthContext);
-}
+  useEffect(() => {
+    if (token) {
+      axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+    } else {
+      delete axios.defaults.headers.common['Authorization'];
+    }
+  }, [token]);
+
+  return (
+    <AuthContext.Provider value={{ user, token, error, setError, login, signup, logout }}>
+      {children}
+    </AuthContext.Provider>
+  );
+};
+
+export const useAuth = () => useContext(AuthContext);

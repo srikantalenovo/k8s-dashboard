@@ -1,11 +1,24 @@
 import jwt from 'jsonwebtoken';
 import User from '../models/user.model.js';
+import { UnauthorizedError, ConflictError } from '../utils/errors.js';
 
-export const login = async (req, res) => {
+/**
+ * Login user
+ */
+export const login = async (req, res, next) => {
   try {
     const { email, password } = req.body;
+
+    // Ensure both fields are present
+    if (!email || !password) {
+      throw new UnauthorizedError('Email and password are required');
+    }
+
     const user = await User.findByCredentials(email, password);
-    
+    if (!user) {
+      throw new UnauthorizedError('Invalid email or password');
+    }
+
     const token = jwt.sign(
       {
         userId: user.id,
@@ -17,6 +30,7 @@ export const login = async (req, res) => {
     );
 
     res.json({
+      success: true,
       user: {
         id: user.id,
         username: user.username,
@@ -27,17 +41,24 @@ export const login = async (req, res) => {
     });
 
   } catch (error) {
-    res.status(401).json({ error: error.message });
+    next(error);
   }
 };
 
-export const signup = async (req, res) => {
+/**
+ * Signup user
+ */
+export const signup = async (req, res, next) => {
   try {
     const { username, email, password, role = 'viewer' } = req.body;
-    
+
+    if (!username || !email || !password) {
+      throw new ConflictError('Username, email, and password are required');
+    }
+
     const existingUser = await User.findOne({ where: { email } });
     if (existingUser) {
-      return res.status(409).json({ error: 'Email already exists' });
+      throw new ConflictError('Email already exists');
     }
 
     const user = await User.create({
@@ -58,6 +79,7 @@ export const signup = async (req, res) => {
     );
 
     res.status(201).json({
+      success: true,
       user: {
         id: user.id,
         username: user.username,
@@ -68,6 +90,6 @@ export const signup = async (req, res) => {
     });
 
   } catch (error) {
-    res.status(500).json({ error: 'Registration failed' });
+    next(error);
   }
 };
