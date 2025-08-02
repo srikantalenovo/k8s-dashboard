@@ -1,4 +1,4 @@
-import { User } from '../models/user.model.js';
+import  User  from '../models/user.model.js';
 import { ForbiddenError } from '../utils/errors.js';
 
 export const getAdminDashboard = async (req, res) => {
