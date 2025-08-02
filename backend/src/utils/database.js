@@ -2,7 +2,10 @@ import { Sequelize } from 'sequelize';
 import dotenv from 'dotenv';
 import logger from './logger.js';
 
-// Configure dotenv safely
+// ✅ Preload models so Sequelize registers them before sync
+import '../models/user.model.js';
+
+// Configure dotenv
 dotenv.config({
   debug: process.env.NODE_ENV === 'development',
   override: false
@@ -16,10 +19,9 @@ const sequelize = new Sequelize({
   port: parseInt(process.env.DB_PORT) || 5432,
   dialect: 'postgres',
   dialectOptions: {
-    ssl: process.env.DB_SSL === 'true' ? {
-      require: true,
-      rejectUnauthorized: false
-    } : false,
+    ssl: process.env.DB_SSL === 'true'
+      ? { require: true, rejectUnauthorized: false }
+      : false,
     connectTimeout: 30000,
     keepAlive: true
   },
@@ -44,7 +46,6 @@ const sequelize = new Sequelize({
   }
 });
 
-// Connection state management
 let connectionActive = false;
 let heartbeatInterval;
 
@@ -58,15 +59,24 @@ sequelize.addHook('afterDisconnect', () => {
   logger.warn('⚠️ Database connection lost');
 });
 
-// Core connection functions
 const establishConnection = async (maxAttempts = 3) => {
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
       await sequelize.authenticate();
+
+      // ✅ Ensure lowercase users table exists
+      const [results] = await sequelize.query(
+        "SELECT table_name FROM information_schema.tables WHERE table_schema='public' AND table_name='users';"
+      );
+      if (results.length === 0) {
+        logger.warn('⚠️ users table not found — Sequelize will create it...');
+      }
+
       await sequelize.sync({
         alter: process.env.NODE_ENV === 'development',
         force: false
       });
+
       return true;
     } catch (error) {
       logger.warn(`Connection attempt ${attempt}/${maxAttempts} failed`);
@@ -99,10 +109,9 @@ const shutdown = async () => {
   }
 };
 
-// Heartbeat monitor (exported separately)
 const startHeartbeat = (interval = 30000) => {
   if (heartbeatInterval) clearInterval(heartbeatInterval);
-  
+
   const monitor = async () => {
     if (!await checkConnection()) {
       logger.warn('Attempting to reconnect...');
@@ -113,7 +122,7 @@ const startHeartbeat = (interval = 30000) => {
       }
     }
   };
-  
+
   heartbeatInterval = setInterval(monitor, interval);
   return heartbeatInterval;
 };

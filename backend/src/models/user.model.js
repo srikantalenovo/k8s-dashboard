@@ -2,7 +2,6 @@ import { DataTypes } from 'sequelize';
 import { sequelize } from '../utils/database.js';
 import bcrypt from 'bcrypt';
 
-// Define the model
 const User = sequelize.define('User', {
   id: {
     type: DataTypes.INTEGER,
@@ -39,8 +38,18 @@ const User = sequelize.define('User', {
   permissions: {
     type: DataTypes.JSONB,
     defaultValue: []
+  },
+  lastLogin: {
+    type: DataTypes.DATE
+  },
+  isActive: {
+    type: DataTypes.BOOLEAN,
+    defaultValue: true
   }
 }, {
+  tableName: 'users',        // ✅ Force lowercase table name
+  freezeTableName: true,     // ✅ Prevent Sequelize from pluralizing
+  timestamps: true,
   hooks: {
     beforeCreate: async (user) => {
       if (user.password) {
@@ -60,8 +69,7 @@ const User = sequelize.define('User', {
         user.permissions = getDefaultPermissions(user.role);
       }
     }
-  },
-  timestamps: true
+  }
 });
 
 // Helper function
@@ -80,31 +88,27 @@ function getDefaultPermissions(role) {
   return permissions[role] || [];
 }
 
-// Add methods
+// Compare password
 User.prototype.comparePassword = async function(candidatePassword) {
   return await bcrypt.compare(candidatePassword, this.password);
 };
 
+// Permission check
 User.prototype.hasPermission = function(resource, action) {
   if (this.role === 'admin') return true;
-  return this.permissions.some(perm => 
+  return this.permissions.some(perm =>
     (perm.resource === resource || perm.resource === '*') &&
     (perm.actions.includes(action) || perm.actions.includes('*'))
   );
 };
 
-// Initialize admin
-User.initAdmin = async () => {
-  const [admin] = await UserModel.findOrCreate({
-    where: { email: 'admin@example.com' },
-    defaults: {
-      username: 'admin',
-      password: 'Admin@123',
-      role: 'admin'
-    }
-  });
-  return admin;
+// Login helper
+User.findByCredentials = async (email, password) => {
+  const user = await User.findOne({ where: { email } });
+  if (!user) throw new Error('Invalid email or password');
+  const isMatch = await user.comparePassword(password);
+  if (!isMatch) throw new Error('Invalid email or password');
+  return user;
 };
 
-// Named export
 export default User;
