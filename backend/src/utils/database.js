@@ -1,124 +1,121 @@
 import { Sequelize } from 'sequelize';
 import dotenv from 'dotenv';
-import { setTimeout as sleep } from 'timers/promises';
 import logger from './logger.js';
 
-dotenv.config();
+// Configure dotenv with debug and override protection
+dotenv.config({
+  debug: process.env.NODE_ENV === 'development',
+  override: false
+});
 
-// Database configuration with enhanced error handling
-const sequelize = new Sequelize(
-  process.env.DB_NAME || 'grepmind',
-  process.env.DB_USER || 'admin',
-  process.env.DB_PASSWORD || 'admin123',
-  {
-    host: process.env.DB_HOST || 'db',
-    port: parseInt(process.env.DB_PORT) || 5432,
-    dialect: 'postgres',
-    logging: (msg) => logger.debug(msg),
-    pool: {
-      max: 10,
-      min: 0,
-      acquire: 30000,
-      idle: 10000
-    },
-    retry: {
-      max: 5,
-      match: [
-        'SequelizeConnectionError',
-        'SequelizeConnectionRefusedError',
-        'SequelizeHostNotFoundError',
-        'SequelizeHostNotReachableError',
-        'SequelizeInvalidConnectionError',
-        'ETIMEDOUT',
-        'ECONNRESET',
-        'ECONNREFUSED'
-      ],
-      backoffBase: 1000,
-      backoffExponent: 1.5
-    }
+const sequelize = new Sequelize({
+  database: process.env.DB_NAME || 'grepmind',
+  username: process.env.DB_USER || 'admin',
+  password: process.env.DB_PASSWORD || 'admin123',
+  host: process.env.DB_HOST || 'db',
+  port: parseInt(process.env.DB_PORT) || 5432,
+  dialect: 'postgres',
+  dialectOptions: {
+    ssl: process.env.DB_SSL === 'true' ? {
+      require: true,
+      rejectUnauthorized: false
+    } : false,
+    connectTimeout: 30000
+  },
+  logging: (msg) => logger.debug(msg),
+  pool: {
+    max: 10,
+    min: 2,
+    acquire: 30000,
+    idle: 10000,
+    evict: 10000
+  },
+  retry: {
+    max: 5,
+    match: [
+      /SequelizeConnectionError/,
+      /SequelizeConnectionRefusedError/,
+      /ECONNRESET/,
+      /ECONNREFUSED/,
+      /ETIMEDOUT/
+    ]
   }
-);
+});
 
-// Connection lifecycle hooks
-sequelize.addHook('afterConnect', (connection) => {
-  logger.info('✅ New database connection established');
-  connection.query('SET TIME ZONE UTC'); // Ensure consistent timezone
+// Connection lifecycle management
+let connectionActive = false;
+
+sequelize.addHook('afterConnect', () => {
+  connectionActive = true;
+  logger.info('✅ Database connection established');
 });
 
 sequelize.addHook('afterDisconnect', () => {
+  connectionActive = false;
   logger.warn('⚠️ Database connection lost');
 });
 
-// Test database connection with retry logic
-const testConnection = async (maxRetries = 3, delayMs = 1000) => {
-  let attempt = 0;
-  
-  while (attempt < maxRetries) {
+// Health check with connection state tracking
+const checkConnection = async () => {
+  try {
+    if (!connectionActive) {
+      await sequelize.authenticate();
+    }
+    await sequelize.query('SELECT 1');
+    return true;
+  } catch (error) {
+    connectionActive = false;
+    logger.error('❌ Database health check failed:', error);
+    return false;
+  }
+};
+
+// Enhanced connection manager
+const establishConnection = async (maxAttempts = 3) => {
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
       await sequelize.authenticate();
-      logger.info('✅ Database connection established');
+      await sequelize.sync({
+        alter: process.env.NODE_ENV === 'development',
+        force: false
+      });
       return true;
     } catch (error) {
-      attempt++;
-      logger.warn(`Connection attempt ${attempt}/${maxRetries} failed`);
-      
-      if (attempt < maxRetries) {
-        const waitTime = delayMs * Math.pow(2, attempt - 1);
-        logger.info(`Retrying in ${waitTime}ms...`);
-        await sleep(waitTime);
-      } else {
-        logger.error('❌ Maximum connection attempts reached');
-        throw error;
-      }
+      logger.warn(`Connection attempt ${attempt}/${maxAttempts} failed`);
+      if (attempt === maxAttempts) throw error;
+      await new Promise(resolve => setTimeout(resolve, 2000 * attempt));
     }
   }
 };
 
-// Graceful shutdown handler
-const gracefulShutdown = async () => {
+// Graceful shutdown
+const shutdown = async () => {
   try {
     await sequelize.close();
     logger.info('✅ Database connection closed gracefully');
     return true;
   } catch (error) {
-    logger.error('❌ Error closing database connection:', error);
+    logger.error('❌ Error closing connection:', error);
     return false;
   }
 };
 
-// Health check function
-const checkHealth = async () => {
-  try {
-    await sequelize.query('SELECT 1');
-    return true;
-  } catch (error) {
-    logger.error('Database health check failed:', error);
-    return false;
-  }
-};
-
-// Model synchronization with safe defaults
-const syncModels = async () => {
-  try {
-    const options = {
-      alter: process.env.NODE_ENV === 'development',
-      force: false,
-      logging: logger.debug
-    };
-    
-    await sequelize.sync(options);
-    logger.info('✅ Database models synchronized');
-    return true;
-  } catch (error) {
-    logger.error('❌ Model synchronization failed:', error);
-    return false;
-  }
+// Heartbeat monitor
+const startHeartbeat = (interval = 30000) => {
+  const check = async () => {
+    if (!await checkConnection()) {
+      logger.warn('Attempting to reconnect...');
+      await establishConnection(1);
+    }
+  };
+  setInterval(check, interval);
+  return check;
 };
 
 export {
   sequelize,
-  testConnection as establishConnection,
-  gracefulShutdown as shutdown,
-  checkHealth,
-  syncModels
+  establishConnection,
+  shutdown,
+  checkConnection,
+  startHeartbeat
 };

@@ -57,45 +57,26 @@ const gracefulShutdown = async (signal) => {
  */
 const startServer = async () => {
   try {
-    // 1. Establish database connection
-    const isConnected = await establishConnection();
-    if (!isConnected) {
-      throw new Error('Failed to establish database connection');
-    }
-
-    // 2. Verify initial health check
-    const isHealthy = await checkConnectionHealth();
-    if (!isHealthy) {
-      throw new Error('Initial database health check failed');
-    }
-
-    // 3. Sync database models
-    await sequelize.sync({ alter: process.env.NODE_ENV !== 'production' });
-    logger.info('✅ Database models synchronized');
-
-    // 4. Start HTTP server
+    // Initialize database
+    await establishConnection();
+    const heartbeat = startHeartbeat();
+    
+    // Start server
     server.listen(PORT, () => {
       logger.info(`Server running on port ${PORT}`);
-      logger.info(`Environment: ${process.env.NODE_ENV || 'development'}`);
     });
 
-    // 5. Setup process handlers
-    process.on('unhandledRejection', (err) => {
-      logger.error('Unhandled Rejection:', err);
-      gracefulShutdown('unhandledRejection');
-    });
+    // Cleanup on exit
+    const cleanup = async () => {
+      clearInterval(heartbeat);
+      await shutdown();
+    };
 
-    process.on('uncaughtException', (err) => {
-      logger.error('Uncaught Exception:', err);
-      gracefulShutdown('uncaughtException');
-    });
-
-    process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
-    process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+    process.on('SIGTERM', cleanup);
+    process.on('SIGINT', cleanup);
 
   } catch (error) {
-    logger.error('Failed to start server:', error);
-    await shutdown();
+    logger.error('Server startup failed:', error);
     process.exit(1);
   }
 };
