@@ -3,7 +3,7 @@ import { sequelize } from '../utils/database.js';
 import bcrypt from 'bcrypt';
 
 // Define the model
-const UserModel = sequelize.define('User', {
+const User = sequelize.define('User', {
   id: {
     type: DataTypes.INTEGER,
     primaryKey: true,
@@ -107,4 +107,4 @@ UserModel.initAdmin = async () => {
 };
 
 // Named export
-export const User = UserModel;
+export default User;
