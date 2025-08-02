@@ -1,9 +1,13 @@
 version: '3.8'
 
+networks:
+  app_network:
+    driver: bridge
+
 services:
   db:
     build: ./database
-    container_name: db
+    container_name: db_service
     environment:
       POSTGRES_USER: admin
       POSTGRES_PASSWORD: admin123
@@ -12,12 +16,13 @@ services:
       - "5432:5432" 
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    networks:
+      - app_network      
 
 
   backend:
     build: ./backend
-    container_name: backend
-    network_mode: host
+    container_name: backend_service
     ports:
       - "5000:5000"
     environment:
@@ -30,18 +35,21 @@ services:
       DATABASE_URL: postgres://admin:admin123@localhost:5432/grepmind
     depends_on:
       - db
+    networks:
+      - app_network       
       
 
   frontend:
     build: ./frontend
-    container_name: frontend
-    network_mode: host     
+    container_name: frontend_service  
     environment:
       - REACT_APP_API_URL=http://localhost:5000    
     ports:
       - "3000:80"
     depends_on:
       - backend
+    networks:
+      - app_network       
        
 
 volumes:
