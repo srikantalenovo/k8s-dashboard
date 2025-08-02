@@ -1,49 +1,120 @@
-// backend/src/controllers/admin.controller.js
 import User from '../models/user.model.js';
-import { NotFoundError, BadRequestError } from '../utils/errors.js';
+import { ForbiddenError, NotFoundError, BadRequestError } from '../utils/errors.js';
 
-// Get all users
-export const getAllUsers = async (req, res, next) => {
+/**
+ * GET /admin/dashboard
+ */
+export const getAdminDashboard = async (req, res) => {
   try {
+    if (!req.user || req.user.role !== 'admin') {
+      throw new ForbiddenError('Insufficient permissions');
+    }
+
     const users = await User.findAll({
-      attributes: ['id', 'username', 'email', 'role', 'permissions', 'isActive', 'createdAt']
+      attributes: ['id', 'username', 'email', 'role', 'permissions', 'createdAt'],
+      order: [['createdAt', 'DESC']],
+      limit: 100
     });
-    res.json(users);
-  } catch (err) {
-    next(err);
-  }
-};
-
-// Update user role & permissions
-export const updateUserAccess = async (req, res, next) => {
-  try {
-    const { id } = req.params;
-    const { role, permissions } = req.body;
-
-    const allowedRoles = ['admin', 'editor', 'viewer'];
-    if (!allowedRoles.includes(role)) {
-      return res.status(400).json({ error: 'Invalid role' });
-    }
-
-    const user = await User.findByPk(id);
-    if (!user) {
-      return res.status(404).json({ error: 'User not found' });
-    }
-
-    if (user.id === req.user.id && role !== 'admin') {
-      return res.status(403).json({ error: 'You cannot change your own role' });
-    }
-
-    user.role = role;
-    user.permissions = Array.isArray(permissions) ? permissions : [];
-    await user.save();
 
     res.json({
       success: true,
-      message: 'User access updated successfully',
-      user
+      data: {
+        users,
+        stats: {
+          totalUsers: await User.count(),
+          activeUsers: await User.count({ where: { isActive: true } }),
+          adminCount: await User.count({ where: { role: 'admin' } })
+        }
+      }
     });
   } catch (error) {
-    next(error);
+    console.error('Admin dashboard error:', error);
+    res.status(error.statusCode || 500).json({ success: false, error: error.message });
+  }
+};
+
+/**
+ * PUT /admin/users/:id/role
+ */
+export const updateUserRole = async (req, res) => {
+  try {
+    if (!req.user || req.user.role !== 'admin') {
+      throw new ForbiddenError('Insufficient permissions');
+    }
+
+    const { id } = req.params;
+    const { role } = req.body;
+
+    if (!['admin', 'editor', 'viewer'].includes(role)) {
+      throw new BadRequestError('Invalid role specified');
+    }
+
+    const user = await User.findByPk(id);
+    if (!user) throw new NotFoundError('User not found');
+
+    user.role = role;
+    await user.save();
+
+    res.json({ success: true, message: 'User role updated successfully', user });
+  } catch (error) {
+    console.error('Update role error:', error);
+    res.status(error.statusCode || 500).json({ success: false, error: error.message });
+  }
+};
+
+/**
+ * PUT /admin/users/:id/access
+ * ✅ Update user's permissions (RBAC)
+ */
+export const updateUserAccess = async (req, res) => {
+  try {
+    if (!req.user || req.user.role !== 'admin') {
+      throw new ForbiddenError('Insufficient permissions');
+    }
+
+    const { id } = req.params;
+    const { permissions } = req.body;
+
+    // Validate permissions array
+    if (!Array.isArray(permissions)) {
+      throw new BadRequestError('Permissions must be an array');
+    }
+    permissions.forEach((perm) => {
+      if (typeof perm.resource !== 'string' || !Array.isArray(perm.actions)) {
+        throw new BadRequestError('Invalid permission format');
+      }
+    });
+
+    const user = await User.findByPk(id);
+    if (!user) throw new NotFoundError('User not found');
+
+    user.permissions = permissions;
+    await user.save();
+
+    res.json({ success: true, message: 'User permissions updated successfully', user });
+  } catch (error) {
+    console.error('Update access error:', error);
+    res.status(error.statusCode || 500).json({ success: false, error: error.message });
+  }
+};
+
+/**
+ * DELETE /admin/users/:id
+ */
+export const deleteUser = async (req, res) => {
+  try {
+    if (!req.user || req.user.role !== 'admin') {
+      throw new ForbiddenError('Insufficient permissions');
+    }
+
+    const { id } = req.params;
+    const user = await User.findByPk(id);
+    if (!user) throw new NotFoundError('User not found');
+
+    await user.destroy();
+    res.json({ success: true, message: 'User deleted successfully' });
+  } catch (error) {
+    console.error('Delete user error:', error);
+    res.status(error.statusCode || 500).json({ success: false, error: error.message });
   }
 };

@@ -1,27 +1,44 @@
 import express from 'express';
-import { getAllUsers, updateUserAccess } from '../controllers/admin.controller.js';
-import { authenticateToken } from '../middleware/auth.middleware.js';
-import { authorizeRoles } from '../middleware/rbac.middleware.js';
+import {
+  getAdminDashboard,
+  deleteUser,
+  updateUserRole,
+  updateUserAccess // ✅ Added only once
+} from '../controllers/admin.controller.js';
 import { authenticate, authorize } from '../middleware/auth.middleware.js';
-
 
 const router = express.Router();
 
-// Only admins can access these routes
-router.use(authenticateToken, authorizeRoles('admin'));
+// ✅ Admin dashboard
+router.get(
+  '/dashboard',
+  authenticate,
+  authorize('admin'),
+  getAdminDashboard
+);
 
-// GET all users
-router.get('/users', getAllUsers);
+// ✅ Update user role
+router.put(
+  '/users/:id/role',
+  authenticate,
+  authorize('admin'),
+  updateUserRole
+);
 
-// Update user role & permissions
-router.put('/users/:id/access', updateUserAccess);
-
-// 🔹 NEW: Update user role & permissions
+// ✅ Update user access/permissions
 router.put(
   '/users/:id/access',
   authenticate,
-  authorize('admin', 'access'),
-  updateUserAccess
+  authorize('admin'),
+  updateUserAccess // ✅ No duplicate imports
+);
+
+// ✅ Delete user
+router.delete(
+  '/users/:id',
+  authenticate,
+  authorize('admin'),
+  deleteUser
 );
 
 export default router;
