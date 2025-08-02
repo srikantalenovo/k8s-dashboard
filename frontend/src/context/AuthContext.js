@@ -21,7 +21,7 @@ export function AuthProvider({ children }) {
   const signup = async (username, email, password) => {
     try {
       setError(null);
-      const response = await axios.post('http://10.0.0.50:5000/api/auth/signup', {
+      const response = await axios.post('http://localhost:5000/api/auth/signup', {
         username,
         email,
         password
@@ -50,7 +50,7 @@ export function AuthProvider({ children }) {
   const login = async (formData) => {
     try {
       setError(null);
-      const response = await axios.post('http://10.0.0.50:5000/api/auth/login', formData, {
+      const response = await axios.post('http://localhost:5000/api/auth/login', formData, {
         validateStatus: (status) => status < 500
       });
 
@@ -82,7 +82,7 @@ export function AuthProvider({ children }) {
     const verifyToken = async () => {
       if (token) {
         try {
-          const response = await axios.get('http://10.0.0.50:5000/api/auth/verify', {
+          const response = await axios.get('http://localhost:5000/api/auth/verify', {
             headers: { Authorization: `Bearer ${token}` }
           });
           setCurrentUser(response.data.user);

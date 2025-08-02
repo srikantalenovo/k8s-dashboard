@@ -126,7 +126,7 @@ User.createDefaultAdmin = async function() {
     await this.create({
       username: 'admin',
       email: 'admin@example.com',
-      password: 'admin123', // In production, use environment variables
+      password: 'Admin@123', // In production, use environment variables
       role: 'admin'
     });
     console.log('Default admin user created');
