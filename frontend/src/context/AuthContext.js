@@ -13,7 +13,7 @@ export const AuthProvider = ({ children }) => {
 
   const login = async (credentials) => {
     try {
-      const { data } = await api.post('/auth/login', credentials);
+      const { data } = await api.post('/api/auth/login', credentials);
 
       // 🔹 Ensure permissions always exist
       const normalizedUser = {
@@ -37,7 +37,7 @@ export const AuthProvider = ({ children }) => {
 
   const signup = async (credentials) => {
     try {
-      const { data } = await api.post('/auth/signup', credentials);
+      const { data } = await api.post('/api/auth/signup', credentials);
 
       // 🔹 Ensure permissions always exist
       const normalizedUser = {
