@@ -2,7 +2,7 @@ import { Sequelize } from 'sequelize';
 import dotenv from 'dotenv';
 import logger from './logger.js';
 
-// Configure dotenv with debug and override protection
+// Configure dotenv safely
 dotenv.config({
   debug: process.env.NODE_ENV === 'development',
   override: false
@@ -20,7 +20,8 @@ const sequelize = new Sequelize({
       require: true,
       rejectUnauthorized: false
     } : false,
-    connectTimeout: 30000
+    connectTimeout: 30000,
+    keepAlive: true
   },
   logging: (msg) => logger.debug(msg),
   pool: {
@@ -28,22 +29,24 @@ const sequelize = new Sequelize({
     min: 2,
     acquire: 30000,
     idle: 10000,
-    evict: 10000
+    evict: 15000
   },
   retry: {
     max: 5,
     match: [
       /SequelizeConnectionError/,
-      /SequelizeConnectionRefusedError/,
       /ECONNRESET/,
       /ECONNREFUSED/,
       /ETIMEDOUT/
-    ]
+    ],
+    backoffBase: 1000,
+    backoffExponent: 1.5
   }
 });
 
-// Connection lifecycle management
+// Connection state management
 let connectionActive = false;
+let heartbeatInterval;
 
 sequelize.addHook('afterConnect', () => {
   connectionActive = true;
@@ -55,22 +58,7 @@ sequelize.addHook('afterDisconnect', () => {
   logger.warn('⚠️ Database connection lost');
 });
 
-// Health check with connection state tracking
-const checkConnection = async () => {
-  try {
-    if (!connectionActive) {
-      await sequelize.authenticate();
-    }
-    await sequelize.query('SELECT 1');
-    return true;
-  } catch (error) {
-    connectionActive = false;
-    logger.error('❌ Database health check failed:', error);
-    return false;
-  }
-};
-
-// Enhanced connection manager
+// Core connection functions
 const establishConnection = async (maxAttempts = 3) => {
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
@@ -88,28 +76,46 @@ const establishConnection = async (maxAttempts = 3) => {
   }
 };
 
-// Graceful shutdown
-const shutdown = async () => {
+const checkConnection = async () => {
   try {
-    await sequelize.close();
-    logger.info('✅ Database connection closed gracefully');
+    await sequelize.query('SELECT 1');
     return true;
   } catch (error) {
-    logger.error('❌ Error closing connection:', error);
+    connectionActive = false;
+    logger.error('Connection check failed:', error);
     return false;
   }
 };
 
-// Heartbeat monitor
+const shutdown = async () => {
+  try {
+    if (heartbeatInterval) clearInterval(heartbeatInterval);
+    await sequelize.close();
+    logger.info('✅ Database connection closed gracefully');
+    return true;
+  } catch (error) {
+    logger.error('Shutdown error:', error);
+    return false;
+  }
+};
+
+// Heartbeat monitor (exported separately)
 const startHeartbeat = (interval = 30000) => {
-  const check = async () => {
+  if (heartbeatInterval) clearInterval(heartbeatInterval);
+  
+  const monitor = async () => {
     if (!await checkConnection()) {
       logger.warn('Attempting to reconnect...');
-      await establishConnection(1);
+      try {
+        await establishConnection(1);
+      } catch (error) {
+        logger.error('Reconnection failed:', error);
+      }
     }
   };
-  setInterval(check, interval);
-  return check;
+  
+  heartbeatInterval = setInterval(monitor, interval);
+  return heartbeatInterval;
 };
 
 export {
