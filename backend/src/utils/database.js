@@ -1,9 +1,11 @@
 import { Sequelize } from 'sequelize';
 import dotenv from 'dotenv';
 import logger from './logger.js';
+import bcrypt from 'bcrypt';
 
 // ✅ Preload models so Sequelize registers them before sync
 import '../models/user.model.js';
+import User from '../models/user.model.js';
 
 // Configure dotenv
 dotenv.config({
@@ -59,6 +61,68 @@ sequelize.addHook('afterDisconnect', () => {
   logger.warn('⚠️ Database connection lost');
 });
 
+// 🔹 Auto Migration Script
+const runMigrations = async () => {
+  logger.info('🔄 Running automatic DB migrations...');
+  
+  // 1️⃣ Add `permissions` column if missing
+  await sequelize.query(`
+    DO $$
+    BEGIN
+      IF NOT EXISTS (
+        SELECT 1
+        FROM information_schema.columns
+        WHERE table_name = 'Users' AND column_name = 'permissions'
+      ) THEN
+        ALTER TABLE "Users" ADD COLUMN permissions JSONB DEFAULT '[]';
+        RAISE NOTICE '✅ Added permissions column to Users table';
+      END IF;
+    END$$;
+  `);
+
+  // 2️⃣ Ensure `role` enum exists & correct
+  await sequelize.query(`
+    DO $$
+    BEGIN
+      IF NOT EXISTS (
+        SELECT 1 FROM pg_type WHERE typname = 'enum_users_role'
+      ) THEN
+        CREATE TYPE "enum_users_role" AS ENUM ('admin', 'editor', 'viewer');
+      END IF;
+
+      ALTER TABLE "Users"
+      ALTER COLUMN "role" DROP DEFAULT,
+      ALTER COLUMN "role" TYPE "enum_users_role"
+      USING ("role"::text::"enum_users_role"),
+      ALTER COLUMN "role" SET DEFAULT 'viewer';
+    END$$;
+  `);
+
+  logger.info('✅ DB migrations completed successfully');
+};
+
+// 🔹 Seed default admin user if not exists
+const seedDefaultAdmin = async () => {
+  const defaultAdminEmail = process.env.ADMIN_EMAIL || 'admin@example.com';
+  const defaultAdminPassword = process.env.ADMIN_PASSWORD || 'Admin@123';
+
+  const existingAdmin = await User.findOne({ where: { email: defaultAdminEmail } });
+
+  if (!existingAdmin) {
+    const hashedPassword = await bcrypt.hash(defaultAdminPassword, 10);
+    await User.create({
+      username: 'admin',
+      email: defaultAdminEmail,
+      password: hashedPassword,
+      role: 'admin',
+      permissions: [{ resource: '*', actions: ['*'] }]
+    });
+    logger.info(`✅ Default admin user created: ${defaultAdminEmail} / ${defaultAdminPassword}`);
+  } else {
+    logger.info('ℹ️ Default admin user already exists');
+  }
+};
+
 const establishConnection = async (maxAttempts = 3) => {
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
@@ -72,10 +136,17 @@ const establishConnection = async (maxAttempts = 3) => {
         logger.warn('⚠️ users table not found — Sequelize will create it...');
       }
 
+      // 🔹 Run migrations before sync
+      await runMigrations();
+
       await sequelize.sync({
         alter: process.env.NODE_ENV === 'development',
         force: false
       });
+      logger.info('✅ Sequelize models synced');
+
+      // 🔹 Seed default admin after sync
+      await seedDefaultAdmin();
 
       return true;
     } catch (error) {
