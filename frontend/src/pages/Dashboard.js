@@ -103,7 +103,7 @@ const Header = ({ currentView, setCurrentView, handleLogout, currentUser }) => {
 
   const fetchUsers = async () => {
     try {
-      const response = await api.get('/api/admin/users');
+      const response = await api.get('/admin/users');
       setUsers(response.data);
     } catch (error) {
       console.error('Error fetching users:', error);
@@ -123,7 +123,7 @@ const Header = ({ currentView, setCurrentView, handleLogout, currentUser }) => {
 
   const handleRoleUpdate = async () => {
     try {
-      await api.put(`/api/admin/users/${selectedUser.id}/access`, {
+      await api.put(`/admin/users/${selectedUser.id}/access`, {
         role: currentRole,
         permissions: selectedUser.permissions || []
       });
