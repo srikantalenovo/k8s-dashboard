@@ -118,3 +118,23 @@ export const deleteUser = async (req, res) => {
     res.status(error.statusCode || 500).json({ success: false, error: error.message });
   }
 };
+
+// ✅ Add this new function
+export const getAllUsers = async (req, res) => {
+  try {
+    // Only admins can access
+    if (req.user.role !== 'admin') {
+      throw new ForbiddenError('Insufficient permissions');
+    }
+
+    const users = await User.findAll({
+      attributes: ['id', 'username', 'email', 'role', 'permissions', 'createdAt'],
+      order: [['createdAt', 'DESC']]
+    });
+
+    res.status(200).json(users);
+  } catch (error) {
+    console.error('Error fetching users:', error);
+    res.status(500).json({ error: 'Failed to fetch users' });
+  }
+};
