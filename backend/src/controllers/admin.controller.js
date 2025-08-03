@@ -87,7 +87,8 @@ export const updateUserAccess = async (req, res) => {
 
     const user = await User.findByPk(id);
     if (!user) throw new NotFoundError('User not found');
-
+    // ✅ Update both role and permissions
+    user.role = role || user.role;
     user.permissions = permissions;
     await user.save();
 
