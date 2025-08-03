@@ -1,3 +1,25 @@
+# 1️⃣ ServiceAccount for backend
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: grepmind-sa
+  namespace: grepmind
+---
+# 2️⃣ ClusterRoleBinding to grant full admin access
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: grepmind-sa-admin-binding
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: cluster-admin
+subjects:
+  - kind: ServiceAccount
+    name: grepmind-sa
+    namespace: grepmind
+---
+# 3️⃣ Backend Deployment using grepmind-sa
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -13,7 +35,7 @@ spec:
       labels:
         app: grepmind-backend
     spec:
-      serviceAccountName: grepmind-sa  # ✅ Uses RBAC
+      serviceAccountName: grepmind-sa   # ✅ Use our admin SA
       containers:
         - name: backend
           image: srikanta1219/grepmind-backend:latest
@@ -32,12 +54,13 @@ spec:
               value: admin123
             - name: NODE_ENV
               value: production
-
 ---
+# 4️⃣ Backend Service
 apiVersion: v1
 kind: Service
 metadata:
   name: grepmind-backend
+  namespace: grepmind
 spec:
   selector:
     app: grepmind-backend
