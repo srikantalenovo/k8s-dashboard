@@ -1,62 +1,70 @@
-import { NotFoundError, InternalServerError } from '../utils/errors.js';
 import k8sService from '../services/k8s.service.js';
 
-/**
- * Get cluster info
- */
 export const getClusterInfo = async (req, res) => {
   try {
-    const clusterInfo = await k8sService.getClusterInfo();
-    res.json({ success: true, data: clusterInfo });
-  } catch (error) {
-    throw new InternalServerError('Failed to fetch cluster information');
+    const data = await k8sService.getClusterInfo();
+    res.json(data);
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to fetch cluster info' });
   }
 };
 
-/**
- * List pods
- */
+export const getNamespaces = async (req, res) => {
+  try {
+    const data = await k8sService.getNamespaces();
+    res.json(data);
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to fetch namespaces' });
+  }
+};
+
+export const getNodes = async (req, res) => {
+  try {
+    const data = await k8sService.getNodes();
+    res.json(data);
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to fetch nodes' });
+  }
+};
+
 export const getPods = async (req, res) => {
   try {
-    const pods = await k8sService.getPods();
-    res.json({ success: true, data: pods });
-  } catch (error) {
-    throw new InternalServerError('Failed to fetch pods');
+    const namespace = req.query.namespace || 'default';
+    const data = await k8sService.getPods(namespace);
+    res.json(data);
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to fetch pods' });
   }
 };
 
-/**
- * Delete a pod
- */
+export const getDeployments = async (req, res) => {
+  try {
+    const namespace = req.query.namespace || 'default';
+    const data = await k8sService.getDeployments(namespace);
+    res.json(data);
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to fetch deployments' });
+  }
+};
+
 export const deletePod = async (req, res) => {
   try {
     const { name } = req.params;
-    const result = await k8sService.deletePod(name);
-
-    if (!result) {
-      throw new NotFoundError(`Pod ${name} not found or could not be deleted`);
-    }
-
-    res.json({ success: true, message: `Pod ${name} deleted successfully` });
-  } catch (error) {
-    throw new InternalServerError('Failed to delete pod');
+    const namespace = req.query.namespace || 'default';
+    const success = await k8sService.deletePod(name, namespace);
+    success ? res.json({ message: 'Pod deleted' }) : res.status(404).json({ error: 'Pod not found' });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to delete pod' });
   }
 };
 
-/**
- * Restart a pod
- */
 export const restartPod = async (req, res) => {
   try {
     const { name } = req.params;
-    const result = await k8sService.restartPod(name);
-
-    if (!result) {
-      throw new NotFoundError(`Pod ${name} not found or could not be restarted`);
-    }
-
-    res.json({ success: true, message: `Pod ${name} restarted successfully` });
-  } catch (error) {
-    throw new InternalServerError('Failed to restart pod');
+    const namespace = req.query.namespace || 'default';
+    const success = await k8sService.restartPod(name, namespace);
+    success ? res.json({ message: 'Pod restarted' }) : res.status(404).json({ error: 'Pod not found' });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to restart pod' });
   }
 };

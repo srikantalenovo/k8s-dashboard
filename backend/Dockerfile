@@ -2,6 +2,14 @@ FROM node:16-alpine
 
 WORKDIR /app
 
+# Install required tools for kubectl
+RUN apk add --no-cache curl bash
+
+# Install kubectl (latest stable)
+RUN curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl" \
+    && install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl \
+    && rm kubectl
+
 # Copy package files first to leverage Docker cache
 COPY package*.json ./
 
@@ -19,9 +27,12 @@ ENV PORT=5000
 ENV JWT_SECRET=ec846f9100f102b76ab9d31eb2d02c98b2aefa24e3fcb24784b9fdf4fb9a75c7fe361a3e6b12eb01d6eab38498b1d06cd6c761642dcdbd2b76e433179d761cb6
 ENV NODE_OPTIONS="--experimental-specifier-resolution=node"
 
+# Create kube config directory
 RUN mkdir -p /root/.kube
 
-COPY ./config/config  /root/.kube/
+# Copy kubeconfig
+COPY ./config/config /root/.kube/config
+RUN chmod 600 /root/.kube/config
 
 EXPOSE 5000
 

@@ -352,28 +352,45 @@ const AnalyzerView = () => (
     </Typography>
   </Box>
 );
+// ResourcesView Starting
 
+// 📍 Replace your existing ResourcesView in Dashboard.js with this:
 const ResourcesView = ({ currentUser }) => {
   const [resourceType, setResourceType] = useState('nodes');
   const [namespace, setNamespace] = useState('default');
+  const [namespaces, setNamespaces] = useState([]);
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
+  // Fetch namespaces automatically
+  const fetchNamespaces = async () => {
+    try {
+      const res = await api.get('/api/k8s/namespaces');
+      setNamespaces(res.data);
+    } catch (err) {
+      console.error('❌ Error fetching namespaces:', err);
+      setNamespaces(['default']); // fallback
+    }
+  };
+
+  // Fetch resource data
   const fetchData = async () => {
     if (!hasPermission(currentUser, resourceType, 'read')) {
       setError('You do not have permission to view this resource');
       setData([]);
       return;
     }
+
     setLoading(true);
     setError(null);
     try {
-      const response = await api.get(
-        `/api/k8s/${resourceType}${resourceType === 'pods' ? `?namespace=${namespace}` : ''}`
-      );
-      const formattedData = Array.isArray(response.data) ? response.data : [response.data];
-      setData(formattedData);
+      let url = `/api/k8s/${resourceType}`;
+      if (['pods', 'deployments'].includes(resourceType)) {
+        url += `?namespace=${namespace}`;
+      }
+      const response = await api.get(url);
+      setData(Array.isArray(response.data) ? response.data : [response.data]);
     } catch (err) {
       setError(err.message || 'Failed to fetch data');
       setData([]);
@@ -381,6 +398,10 @@ const ResourcesView = ({ currentUser }) => {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    fetchNamespaces();
+  }, []);
 
   useEffect(() => {
     fetchData();
@@ -396,6 +417,7 @@ const ResourcesView = ({ currentUser }) => {
   return (
     <Box sx={{ p: { xs: 1, sm: 2 } }}>
       <Grid container spacing={2} alignItems="center" sx={{ mb: 2 }}>
+        {/* Resource Type Selector */}
         <Grid item xs={12} md={4}>
           <MotionPaper>
             <Select
@@ -417,6 +439,8 @@ const ResourcesView = ({ currentUser }) => {
             </Select>
           </MotionPaper>
         </Grid>
+
+        {/* Namespace Selector */}
         {['pods', 'deployments'].includes(resourceType) && (
           <Grid item xs={12} md={4}>
             <MotionPaper>
@@ -426,15 +450,15 @@ const ResourcesView = ({ currentUser }) => {
                 onChange={(e) => setNamespace(e.target.value)}
                 sx={{ color: 'white', '& .MuiSelect-icon': { color: 'white' } }}
               >
-                <MenuItem value="default">default</MenuItem>
-                <MenuItem value="kube-system">kube-system</MenuItem>
-                {hasPermission(currentUser, 'namespaces', 'read') && (
-                  <MenuItem value="all">All Namespaces</MenuItem>
-                )}
+                {namespaces.map((ns) => (
+                  <MenuItem key={ns} value={ns}>{ns}</MenuItem>
+                ))}
               </Select>
             </MotionPaper>
           </Grid>
         )}
+
+        {/* Refresh Button */}
         <Grid item>
           <IconButton onClick={fetchData} sx={{
             color: 'white',
@@ -445,8 +469,18 @@ const ResourcesView = ({ currentUser }) => {
           </IconButton>
         </Grid>
       </Grid>
+
+      {/* Loading Indicator */}
       {loading && <LinearProgress sx={{ height: 2, borderRadius: 5, mb: 2 }} />}
-      {error && <MotionPaper sx={{ p: 2, mb: 2 }}><Typography color="error">{error}</Typography></MotionPaper>}
+
+      {/* Error Message */}
+      {error && (
+        <MotionPaper sx={{ p: 2, mb: 2 }}>
+          <Typography color="error">{error}</Typography>
+        </MotionPaper>
+      )}
+
+      {/* Data Table */}
       <MotionPaper>
         <TableContainer>
           <Table>
@@ -477,6 +511,8 @@ const ResourcesView = ({ currentUser }) => {
   );
 };
 
+
+// ResourcesView ending
 const LogsView = () => (
   <Box>
     <Typography variant="h4" gutterBottom sx={{ color: 'white' }}>
