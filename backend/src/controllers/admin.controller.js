@@ -68,35 +68,35 @@ export const updateUserRole = async (req, res) => {
  */
 export const updateUserAccess = async (req, res) => {
   try {
-    if (!req.user || req.user.role !== 'admin') {
-      throw new ForbiddenError('Insufficient permissions');
+    const { role, permissions } = req.body;
+
+    // Only admin can update
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({ error: 'Forbidden' });
     }
 
-    const { id } = req.params;
-    const { permissions } = req.body;
-
-    // Validate permissions array
-    if (!Array.isArray(permissions)) {
-      throw new BadRequestError('Permissions must be an array');
+    const user = await User.findByPk(req.params.id);
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
     }
-    permissions.forEach((perm) => {
-      if (typeof perm.resource !== 'string' || !Array.isArray(perm.actions)) {
-        throw new BadRequestError('Invalid permission format');
-      }
-    });
 
-    const user = await User.findByPk(id);
-    if (!user) throw new NotFoundError('User not found');
+    // ✅ Update both role & permissions
+    if (role) {
+      user.role = role;
+    }
+    if (permissions) {
+      user.permissions = permissions;
+    }
 
-    user.permissions = permissions;
     await user.save();
 
-    res.json({ success: true, message: 'User permissions updated successfully', user });
+    res.status(200).json({ message: 'User updated successfully', user });
   } catch (error) {
-    console.error('Update access error:', error);
-    res.status(error.statusCode || 500).json({ success: false, error: error.message });
+    console.error('Error updating user access:', error);
+    res.status(500).json({ error: 'Failed to update user access' });
   }
 };
+
 
 /**
  * DELETE /admin/users/:id
