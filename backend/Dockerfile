@@ -27,12 +27,6 @@ ENV PORT=5000
 ENV JWT_SECRET=ec846f9100f102b76ab9d31eb2d02c98b2aefa24e3fcb24784b9fdf4fb9a75c7fe361a3e6b12eb01d6eab38498b1d06cd6c761642dcdbd2b76e433179d761cb6
 ENV NODE_OPTIONS="--experimental-specifier-resolution=node"
 
-# Create kube config directory
-RUN mkdir -p /root/.kube
-
-# Copy kubeconfig
-COPY ./config/config /root/.kube/config
-RUN chmod 600 /root/.kube/config
 
 EXPOSE 5000
 
