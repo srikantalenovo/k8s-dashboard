@@ -12,7 +12,6 @@ import {
 } from './utils/database.js';
 import logger from './utils/logger.js';
 import adminRoutes from './routes/admin.routes.js';
-import { establishConnection, shutdown } from './utils/database.js';
 
 
 // Import routes
