@@ -58,6 +58,17 @@ const ROLE_PRESETS = {
   ]
 };
 
+// ✅ RBAC helper for plain JSON user objects
+const hasPermission = (user, resource, action) => {
+  if (!user) return false;
+  if (user.role === 'admin') return true;
+  return user.permissions?.some(
+    perm =>
+      (perm.resource === resource || perm.resource === '*') &&
+      (perm.actions.includes(action) || perm.actions.includes('*'))
+  );
+};
+
 // Gradient background styling
 const GradientBox = styled(Box)(({ theme }) => ({
   minHeight: '100vh',
