@@ -19,7 +19,7 @@ spec:
             - containerPort: 80
           env:
             - name: REACT_APP_API_URL
-              value: "http://grepmind.sritechhub.com
+              value: "http://grepmind.sritechhub.com"
 ---
 apiVersion: v1
 kind: Service
