@@ -11,7 +11,6 @@ import {
   startHeartbeat 
 } from './utils/database.js';
 import logger from './utils/logger.js';
-import adminRoutes from './routes/admin.routes.js';
 
 
 // Import routes
