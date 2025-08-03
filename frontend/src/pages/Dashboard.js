@@ -142,7 +142,7 @@ const Header = ({ currentView, setCurrentView, handleLogout, currentUser }) => {
     { name: 'Analyzer', icon: <AnalyticsIcon />, permission: ['analyzer', 'read'] },
     { name: 'Resources', icon: <ResourcesIcon />, permission: ['nodes', 'read'] },
     { name: 'Logs', icon: <LogsIcon />, permission: ['logs', 'read'] }
-  ].filter(item => !item.permission || currentUser?.hasPermission(...item.permission));
+  ].filter(item => !item.permission || hasPermission(currentUser, ...item.permission));
 
   return (
     <Box sx={{
@@ -359,7 +359,7 @@ const ResourcesView = ({ currentUser }) => {
   const [error, setError] = useState(null);
 
   const fetchData = async () => {
-    if (!currentUser?.hasPermission(resourceType, 'read')) {
+    if (!hasPermission(currentUser, resourceType, 'read')) {
       setError('You do not have permission to view this resource');
       setData([]);
       return;
@@ -405,7 +405,7 @@ const ResourcesView = ({ currentUser }) => {
               sx={{ color: 'white', '& .MuiSelect-icon': { color: 'white' } }}
             >
               {Object.entries(resourceConfig)
-                .filter(([key]) => currentUser?.hasPermission(key, 'read'))
+                .filter(([key]) => hasPermission(currentUser, key, 'read'))
                 .map(([key, { icon, label }]) => (
                   <MenuItem key={key} value={key} sx={{ color: '#333' }}>
                     <Box display="flex" alignItems="center">
@@ -429,7 +429,7 @@ const ResourcesView = ({ currentUser }) => {
               >
                 <MenuItem value="default">default</MenuItem>
                 <MenuItem value="kube-system">kube-system</MenuItem>
-                {currentUser?.hasPermission('namespaces', 'read') && (
+                {hasPermission(currentUser, 'namespaces', 'read') && (
                   <MenuItem value="all">All Namespaces</MenuItem>
                 )}
               </Select>
@@ -502,9 +502,9 @@ const Dashboard = () => {
   const renderView = () => {
     switch (currentView) {
       case 'Home': return <HomeView />;
-      case 'Analyzer': return currentUser?.hasPermission('analyzer', 'read') ? <AnalyzerView /> : <HomeView />;
-      case 'Resources': return currentUser?.hasPermission('nodes', 'read') ? <ResourcesView currentUser={currentUser} /> : <HomeView />;
-      case 'Logs': return currentUser?.hasPermission('logs', 'read') ? <LogsView /> : <HomeView />;
+      case 'Analyzer': return hasPermission(currentUser, 'analyzer', 'read') ? <AnalyzerView /> : <HomeView />;
+      case 'Resources': return hasPermission(currentUser, 'nodes', 'read') ? <ResourcesView currentUser={currentUser} /> : <HomeView />;
+      case 'Logs': return hasPermission(currentUser, 'logs', 'read') ? <LogsView /> : <HomeView />;
       default: return <HomeView />;
     }
   };
