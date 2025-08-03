@@ -5,8 +5,14 @@ metadata:
   annotations:
     nginx.ingress.kubernetes.io/rewrite-target: /
 spec:
+  ingressClassName: nginx
+  tls:
+    - hosts:
+        - "*.sritechhub.com"
+      secretName: grepmind-tls
+
   rules:
-    - host: grepmind.local
+    - host: grepmind.sritechhub.com
       http:
         paths:
           - path: /
