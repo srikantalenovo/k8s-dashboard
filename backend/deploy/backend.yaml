@@ -14,7 +14,7 @@ spec:
     spec:
       containers:
         - name: backend
-          image: your-dockerhub-username/grepmind-backend:latest # 🛠️ CHANGE
+          image: srikanta1219/grepmind-backend:latest
           ports:
             - containerPort: 5000
           env:

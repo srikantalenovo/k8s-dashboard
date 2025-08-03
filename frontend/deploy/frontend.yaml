@@ -14,7 +14,7 @@ spec:
     spec:
       containers:
         - name: frontend
-          image: your-dockerhub-username/grepmind-frontend:latest # 🛠️ CHANGE
+          image: srikanta1219/grepmind-frontend:latest
           ports:
             - containerPort: 80
           env:

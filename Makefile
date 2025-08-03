@@ -21,9 +21,17 @@ clean:
 	docker builder prune -a --force
 
 # Just build without cache
-build:
+build&push:
 	@echo "🔨 Building fresh images..."
 	docker-compose -f $(COMPOSE_FILE) build --no-cache
+	@echo "🔨 tag fresh images..."
+	docker tag k8s-dashboard_db:latest srikanta1219/grepmind-db:latest
+	docker tag k8s-dashboard_db:latest srikanta1219/grepmind-backend:latest
+	docker tag k8s-dashboard_db:latest srikanta1219/grepmind-frontend:latest
+	@echo "🔨 Publish image to dockerhub ""
+	docker push srikanta1219/grepmind-db:latest
+	docker push srikanta1219/grepmind-backend:latest
+	docker push srikanta1219/grepmind-frontend:latest
 
 # Start fresh containers
 up:

@@ -4,12 +4,14 @@ metadata:
   name: postgres-pv
 spec:
   capacity:
-    storage: 5Gi
+    storage: 2Gi
   accessModes:
     - ReadWriteMany
+  mountOptions:
+    - nfsvers=4.1
   nfs:
-    server: 192.168.1.100 # 🛠️ CHANGE to your NFS server IP
-    path: /export/postgres-data
+    server: 10.0.0.20 #NGE to your NFS server IP
+    path: /srv/nfs/kubedata/db
   persistentVolumeReclaimPolicy: Retain
 
 ---
@@ -22,7 +24,7 @@ spec:
     - ReadWriteMany
   resources:
     requests:
-      storage: 5Gi
+      storage: 2Gi
   volumeName: postgres-pv
 
 ---
@@ -42,7 +44,7 @@ spec:
     spec:
       containers:
         - name: postgres
-          image: postgres:15
+          image: srikanta1219/grepmind-db:latest
           ports:
             - containerPort: 5432
           env:
