@@ -12,6 +12,7 @@ spec:
       labels:
         app: grepmind-backend
     spec:
+      serviceAccountName: grepmind-sa
       containers:
         - name: backend
           image: srikanta1219/grepmind-backend:latest
