@@ -72,10 +72,10 @@ const runMigrations = async () => {
       IF NOT EXISTS (
         SELECT 1
         FROM information_schema.columns
-        WHERE table_name = 'Users' AND column_name = 'permissions'
+        WHERE table_name = 'users' AND column_name = 'permissions'
       ) THEN
-        ALTER TABLE "Users" ADD COLUMN permissions JSONB DEFAULT '[]';
-        RAISE NOTICE '✅ Added permissions column to Users table';
+        ALTER TABLE users ADD COLUMN permissions JSONB DEFAULT '[]';
+        RAISE NOTICE '✅ Added permissions column to users table';
       END IF;
     END$$;
   `);
@@ -90,7 +90,7 @@ const runMigrations = async () => {
         CREATE TYPE "enum_users_role" AS ENUM ('admin', 'editor', 'viewer');
       END IF;
 
-      ALTER TABLE "Users"
+      ALTER TABLE "users"
       ALTER COLUMN "role" DROP DEFAULT,
       ALTER COLUMN "role" TYPE "enum_users_role"
       USING ("role"::text::"enum_users_role"),
