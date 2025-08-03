@@ -354,7 +354,7 @@ const AnalyzerView = () => (
 );
 // ResourcesView Starting
 
-// 📍 Replace your existing ResourcesView in Dashboard.js with this:
+// Line ~210 in Dashboard.js — Replace the whole ResourcesView with this
 const ResourcesView = ({ currentUser }) => {
   const [resourceType, setResourceType] = useState('nodes');
   const [namespace, setNamespace] = useState('default');
@@ -363,37 +363,36 @@ const ResourcesView = ({ currentUser }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  // Fetch namespaces automatically
+  // Fetch namespaces from backend
   const fetchNamespaces = async () => {
     try {
       const res = await api.get('/api/k8s/namespaces');
-      setNamespaces(res.data);
+      setNamespaces(res.data || []);
     } catch (err) {
-      console.error('❌ Error fetching namespaces:', err);
-      setNamespaces(['default']); // fallback
+      console.error('Error fetching namespaces:', err);
     }
   };
 
-  // Fetch resource data
+  // Fetch data based on selected resource type & namespace
   const fetchData = async () => {
     if (!hasPermission(currentUser, resourceType, 'read')) {
       setError('You do not have permission to view this resource');
       setData([]);
       return;
     }
-
     setLoading(true);
     setError(null);
     try {
       let url = `/api/k8s/${resourceType}`;
-      if (['pods', 'deployments'].includes(resourceType)) {
+      if (resourceType === 'pods') {
         url += `?namespace=${namespace}`;
       }
-      const response = await api.get(url);
-      setData(Array.isArray(response.data) ? response.data : [response.data]);
+      const res = await api.get(url);
+      const formatted = Array.isArray(res.data) ? res.data : [res.data];
+      setData(formatted);
     } catch (err) {
-      setError(err.message || 'Failed to fetch data');
-      setData([]);
+      console.error(`Error fetching ${resourceType}:`, err);
+      setError(err.message || `Failed to fetch ${resourceType}`);
     } finally {
       setLoading(false);
     }
@@ -440,8 +439,8 @@ const ResourcesView = ({ currentUser }) => {
           </MotionPaper>
         </Grid>
 
-        {/* Namespace Selector */}
-        {['pods', 'deployments'].includes(resourceType) && (
+        {/* Namespace Selector - only show for pods */}
+        {resourceType === 'pods' && (
           <Grid item xs={12} md={4}>
             <MotionPaper>
               <Select
@@ -470,15 +469,11 @@ const ResourcesView = ({ currentUser }) => {
         </Grid>
       </Grid>
 
-      {/* Loading Indicator */}
+      {/* Loading & Errors */}
       {loading && <LinearProgress sx={{ height: 2, borderRadius: 5, mb: 2 }} />}
-
-      {/* Error Message */}
-      {error && (
-        <MotionPaper sx={{ p: 2, mb: 2 }}>
-          <Typography color="error">{error}</Typography>
-        </MotionPaper>
-      )}
+      {error && <MotionPaper sx={{ p: 2, mb: 2 }}>
+        <Typography color="error">{error}</Typography>
+      </MotionPaper>}
 
       {/* Data Table */}
       <MotionPaper>
@@ -510,6 +505,7 @@ const ResourcesView = ({ currentUser }) => {
     </Box>
   );
 };
+
 
 
 // ResourcesView ending
