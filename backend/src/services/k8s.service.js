@@ -1,46 +1,119 @@
-import * as k8s from '@kubernetes/client-node';
+import { KubeConfig, CoreV1Api } from '@kubernetes/client-node';
 import fs from 'fs';
 import logger from '../utils/logger.js';
 
 class K8sService {
   constructor() {
-    this.kc = new k8s.KubeConfig();
+    this.kc = new KubeConfig();
 
-    const kubeConfigPath = process.env.KUBECONFIG || '/root/.kube/config';
-
-    if (!fs.existsSync(kubeConfigPath)) {
-      logger.error(`❌ Kubeconfig file not found at: ${kubeConfigPath}`);
-      throw new Error('Kubeconfig missing — cannot connect to cluster');
+    // Detect mode: In-cluster or external
+    if (fs.existsSync('/var/run/secrets/kubernetes.io/serviceaccount/token')) {
+      logger.info('📦 Running inside Kubernetes cluster - using in-cluster config');
+      this.kc.loadFromCluster();
+      this.mode = 'in-cluster';
+    } else {
+      logger.info('💻 Running outside cluster - using default kubeconfig');
+      this.kc.loadFromDefault();
+      this.mode = 'external';
     }
 
-    this.kc.loadFromFile(kubeConfigPath);
-    this.coreV1Api = this.kc.makeApiClient(k8s.CoreV1Api);
+    this.coreV1Api = this.kc.makeApiClient(CoreV1Api);
   }
 
   async verifyClusterConnection() {
     try {
-      const context = this.kc.getCurrentContext();
-      const cluster = this.kc.getCluster(context);
-
-      logger.info(`🌐 Using kube context: ${context}`);
-      logger.info(`📡 API server: ${cluster?.server || 'Unknown'}`);
-
-      const res = await this.coreV1Api.listNamespace();
-
-      logger.debug('📦 Raw namespace API response:', JSON.stringify(res.body || res, null, 2));
-
-      if (!res?.body?.items) {
+      const nsRes = await this.coreV1Api.listNamespace();
+      if (!nsRes.body.items || nsRes.body.items.length === 0) {
         throw new Error('Namespace list is empty or invalid');
       }
 
-      logger.info(`✅ Kubernetes cluster connected — found ${res.body.items.length} namespaces`);
-      res.body.items.forEach(ns => {
-        logger.info(`📂 Namespace: ${ns.metadata?.name}`);
-      });
+      logger.info(`🌐 Kubernetes mode: ${this.mode}`);
+      logger.info(`📡 API server: ${this.kc.getCurrentCluster()?.server || 'Unknown'}`);
+      logger.info(`✅ Found ${nsRes.body.items.length} namespaces`);
+      return true;
+    } catch (error) {
+      logger.error(`❌ Unable to connect to Kubernetes cluster: ${error.message}`, { stack: error.stack });
+      return false;
+    }
+  }
 
-    } catch (err) {
-      logger.error(`❌ Unable to connect to Kubernetes cluster: ${err.message}`, { stack: err.stack });
-      throw err;
+  async getClusterInfo() {
+    try {
+      const nodes = await this.coreV1Api.listNode();
+      return {
+        clusterName: this.kc.getCurrentCluster()?.name || 'Unknown',
+        nodes: nodes.body.items.length,
+        status: 'Healthy',
+        timestamp: new Date()
+      };
+    } catch (error) {
+      logger.error('❌ Error fetching cluster info:', error);
+      throw error;
+    }
+  }
+
+  async getNamespaces() {
+    try {
+      const res = await this.coreV1Api.listNamespace();
+      return res.body.items.map(ns => ns.metadata.name);
+    } catch (error) {
+      logger.error('❌ Error fetching namespaces:', error);
+      throw error;
+    }
+  }
+
+  async getNodes() {
+    try {
+      const res = await this.coreV1Api.listNode();
+      return res.body.items.map(node => ({
+        name: node.metadata.name,
+        status: node.status.conditions?.find(c => c.type === 'Ready')?.status || 'Unknown',
+        roles: node.metadata.labels?.['kubernetes.io/role'] || 'worker',
+        version: node.status.nodeInfo?.kubeletVersion
+      }));
+    } catch (error) {
+      logger.error('❌ Error fetching nodes:', error);
+      throw error;
+    }
+  }
+
+  async getPods(namespace = 'default') {
+    try {
+      if (!namespace) throw new Error('Namespace is required');
+      const res = await this.coreV1Api.listNamespacedPod(namespace);
+      return res.body.items.map(pod => ({
+        name: pod.metadata.name,
+        status: pod.status.phase,
+        namespace: pod.metadata.namespace,
+        nodeName: pod.spec.nodeName,
+        startTime: pod.status.startTime
+      }));
+    } catch (error) {
+      logger.error(`❌ Error fetching pods in namespace ${namespace}:`, error);
+      throw error;
+    }
+  }
+
+  async deletePod(name, namespace = 'default') {
+    try {
+      await this.coreV1Api.deleteNamespacedPod(name, namespace);
+      logger.info(`🗑️ Pod deleted: ${name} in namespace ${namespace}`);
+      return true;
+    } catch (error) {
+      logger.error(`❌ Error deleting pod ${name} in namespace ${namespace}:`, error);
+      return false;
+    }
+  }
+
+  async restartPod(name, namespace = 'default') {
+    try {
+      const pod = await this.coreV1Api.readNamespacedPod(name, namespace);
+      await this.coreV1Api.deleteNamespacedPod(name, namespace);
+      logger.info(`🔄 Restarted pod: ${name} in namespace ${namespace}`);
+      return pod.body;
+    } catch (error) {
+      logger.error(`❌ Error restarting pod ${name} in namespace ${namespace}:`, error);
+      return false;
     }
   }
 }

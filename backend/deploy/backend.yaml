@@ -1,0 +1,53 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: grepmind-backend
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: grepmind-backend
+  template:
+    metadata:
+      labels:
+        app: grepmind-backend
+    spec:
+      containers:
+        - name: backend
+          image: your-dockerhub-username/grepmind-backend:latest # 🛠️ CHANGE
+          ports:
+            - containerPort: 5000
+          env:
+            - name: DB_HOST
+              value: postgres
+            - name: DB_PORT
+              value: "5432"
+            - name: DB_NAME
+              value: grepmind
+            - name: DB_USER
+              value: admin
+            - name: DB_PASSWORD
+              value: admin123
+            - name: NODE_ENV
+              value: production
+            - name: KUBECONFIG
+              value: /root/.kube/config
+          volumeMounts:
+            - name: kube-config
+              mountPath: /root/.kube
+              readOnly: true
+      volumes:
+        - name: kube-config
+          hostPath:
+            path: /root/.kube # 🛠️ Make sure kubeconfig exists on the node
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: grepmind-backend
+spec:
+  selector:
+    app: grepmind-backend
+  ports:
+    - port: 5000
+      targetPort: 5000
