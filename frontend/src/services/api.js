@@ -1,29 +1,34 @@
 import axios from 'axios';
 
+let baseURL;
+
+// Detect environment and set API base URL
+if (window.location.hostname === 'localhost') {
+  // Local development
+  baseURL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
+} else {
+  // Production (K8s via Ingress) - same domain, /api path
+  baseURL = process.env.REACT_APP_API_URL || '/api';
+}
+
 const api = axios.create({
- baseURL: process.env.REACT_APP_API_URL || 'http://grepmind-backend:5000/api',
- timeout: 10000,
- headers: {
-   'Content-Type': 'application/json',
- }
+  baseURL,
+  timeout: 10000,
+  headers: {
+    'Content-Type': 'application/json',
+  }
 });
-//
-// const api = axios.create({
-//   baseURL: process.env.NODE_ENV === 'production' 
-//     ? '/api' 
-//     : 'http://localhost:5000/api',
-//   timeout: 10000
-// });
 
 // Add request interceptor for auth tokens
-api.interceptors.request.use(config => {
-  const token = localStorage.getItem('token');
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
-  }
-  return config;
-}, error => {
-  return Promise.reject(error);
-});
+api.interceptors.request.use(
+  config => {
+    const token = localStorage.getItem('token');
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+    return config;
+  },
+  error => Promise.reject(error)
+);
 
 export default api;
