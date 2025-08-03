@@ -2,6 +2,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: grepmind-backend
+  namespace: grepmind
 spec:
   replicas: 1
   selector:
@@ -12,7 +13,7 @@ spec:
       labels:
         app: grepmind-backend
     spec:
-      serviceAccountName: grepmind-sa
+      serviceAccountName: grepmind-sa  # ✅ Uses RBAC
       containers:
         - name: backend
           image: srikanta1219/grepmind-backend:latest
@@ -31,16 +32,7 @@ spec:
               value: admin123
             - name: NODE_ENV
               value: production
-            - name: KUBECONFIG
-              value: /root/.kube/config
-          volumeMounts:
-            - name: kube-config
-              mountPath: /root/.kube
-              readOnly: true
-      volumes:
-        - name: kube-config
-          hostPath:
-            path: /root/.kube # 🛠️ Make sure kubeconfig exists on the node
+
 ---
 apiVersion: v1
 kind: Service
