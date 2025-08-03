@@ -118,3 +118,15 @@ export const deleteUser = async (req, res) => {
     res.status(error.statusCode || 500).json({ success: false, error: error.message });
   }
 };
+// ✅ New controller for /api/admin/users
+export const getAllUsers = async (req, res) => {
+  try {
+    const users = await User.findAll({
+      attributes: ['id', 'username', 'email', 'role', 'permissions', 'createdAt']
+    });
+    res.json(users);
+  } catch (error) {
+    console.error('Error fetching users:', error);
+    res.status(500).json({ error: 'Failed to fetch users' });
+  }
+};

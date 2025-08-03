@@ -3,13 +3,14 @@ import {
   getAdminDashboard,
   deleteUser,
   updateUserRole,
-  updateUserAccess // ✅ Added only once
+  updateUserAccess, // ✅ Added only once
+  getAllUsers // ✅ Added for RBAC UI list
 } from '../controllers/admin.controller.js';
 import { authenticate, authorize } from '../middleware/auth.middleware.js';
 
 const router = express.Router();
 
-// ✅ Admin dashboard
+// ✅ Admin  
 router.get(
   '/dashboard',
   authenticate,
@@ -40,5 +41,9 @@ router.delete(
   authorize('admin'),
   deleteUser
 );
+
+// ✅ New route for Dashboard.js RBAC User List
+router.get('/users', authenticate, authorize('admin'), getAllUsers);
+
 
 export default router;

@@ -1,3 +1,7 @@
+import express from 'express';
+import cors from 'cors';
+import morgan from 'morgan';
+import dotenv from 'dotenv';
 import app from './app.js';
 import { createServer } from 'http';
 import { 
@@ -8,7 +12,29 @@ import {
 } from './utils/database.js';
 import logger from './utils/logger.js';
 import adminRoutes from './routes/admin.routes.js';
-app.use('/admin', adminRoutes);
+import { establishConnection, shutdown } from './utils/database.js';
+
+
+// Import routes
+import authRoutes from './routes/auth.routes.js';
+import adminRoutes from './routes/admin.routes.js'; // ✅ Added for RBAC API
+import k8sRoutes from './routes/k8s.routes.js';
+
+dotenv.config();
+
+const app = express();
+
+// Middleware
+app.use(cors());
+app.use(express.json());
+app.use(morgan('dev'));
+
+// API Routes
+app.use('/api/auth', authRoutes);
+app.use('/api/admin', adminRoutes); // ✅ Mount Admin routes for RBAC User Management
+app.use('/api/k8s', k8sRoutes);
+
+app.use('/api/admin', adminRoutes);
 const PORT = process.env.PORT || 5000;
 const server = createServer(app);
 
