@@ -8,6 +8,7 @@ import {
 } from './utils/database.js';
 import logger from './utils/logger.js';
 import { errorHandler } from './utils/errors.js';
+import k8sService from './services/k8s.service.js'; // ✅ Import K8s service
 
 dotenv.config();
 
@@ -48,6 +49,9 @@ const startServer = async () => {
     await establishConnection();
     startHeartbeat();
     logger.info('🫀 Database heartbeat monitor started');
+
+    //  ✅ Check Kubernetes cluster connection
+    await k8sService.verifyClusterConnection();
 
     // Start server
     server.listen(PORT, () => {
