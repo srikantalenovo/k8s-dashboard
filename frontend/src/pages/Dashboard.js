@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import {
-  Box, Typography, Select, MenuItem, Table, TableBody,
+  Box, Typography, Select, MenuItem, Table, TableBody, Tooltip,
   TableCell, TableContainer, TableHead, TableRow, Button, IconButton, Paper, Grid,
   Avatar, LinearProgress, styled, Container, useTheme, Popover,
   Dialog, DialogTitle, DialogContent, DialogActions, List,
@@ -31,7 +31,7 @@ import {
 } from '@mui/icons-material';
 import { motion } from 'framer-motion';
 
-// ✅ RBAC permission presets
+// Permission presets
 const PERMISSION_OPTIONS = [
   { resource: 'pods', actions: ['read', 'delete'] },
   { resource: 'nodes', actions: ['read'] },
@@ -41,7 +41,6 @@ const PERMISSION_OPTIONS = [
   { resource: '*', actions: ['*'] }
 ];
 
-// Role to default permissions mapping
 const ROLE_PRESETS = {
   admin: [{ resource: '*', actions: ['*'] }],
   editor: [
@@ -58,7 +57,6 @@ const ROLE_PRESETS = {
   ]
 };
 
-// ✅ RBAC helper for plain JSON user objects
 const hasPermission = (user, resource, action) => {
   if (!user) return false;
   if (user.role === 'admin') return true;
@@ -69,11 +67,13 @@ const hasPermission = (user, resource, action) => {
   );
 };
 
-// Gradient background styling
 const GradientBox = styled(Box)(({ theme }) => ({
   minHeight: '100vh',
   background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-  padding: theme.spacing(3),
+  padding: theme.spacing(2),
+  [theme.breakpoints.up('md')]: {
+    padding: theme.spacing(3)
+  }
 }));
 
 const MotionPaper = ({ children }) => (
@@ -92,7 +92,6 @@ const MotionPaper = ({ children }) => (
   </motion.div>
 );
 
-// Header with RBAC User Management
 const Header = ({ currentView, setCurrentView, handleLogout, currentUser }) => {
   const theme = useTheme();
   const [anchorEl, setAnchorEl] = useState(null);
@@ -158,25 +157,26 @@ const Header = ({ currentView, setCurrentView, handleLogout, currentUser }) => {
   return (
     <Box sx={{
       display: 'flex',
+      flexDirection: { xs: 'column', sm: 'row' },
       justifyContent: 'space-between',
-      alignItems: 'center',
+      alignItems: { xs: 'flex-start', sm: 'center' },
       padding: theme.spacing(2),
       backgroundColor: 'rgba(255, 255, 255, 0.1)',
       backdropFilter: 'blur(10px)',
       borderRadius: '12px',
       marginBottom: theme.spacing(3),
-      boxShadow: '0 4px 30px rgba(0, 0, 0, 0.1)'
+      gap: 2
     }}>
       {/* Logo */}
       <Box sx={{ display: 'flex', alignItems: 'center' }}>
-        <DashboardIcon sx={{ fontSize: 40, color: 'white', marginRight: theme.spacing(1) }} />
-        <Typography variant="h5" sx={{ color: 'white', fontWeight: 'bold', fontFamily: '"Poppins", sans-serif' }}>
+        <DashboardIcon sx={{ fontSize: 36, color: 'white', mr: 1 }} />
+        <Typography variant="h6" sx={{ color: 'white', fontWeight: 'bold' }}>
           GrepMind
         </Typography>
       </Box>
 
       {/* Navigation */}
-      <Box sx={{ display: 'flex', gap: theme.spacing(1) }}>
+      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: theme.spacing(1) }}>
         {navItems.map((item) => (
           <Button
             key={item.name}
@@ -188,8 +188,7 @@ const Header = ({ currentView, setCurrentView, handleLogout, currentUser }) => {
               '&:hover': { backgroundColor: 'rgba(255, 255, 255, 0.15)', color: 'white' },
               borderRadius: '8px',
               textTransform: 'none',
-              padding: theme.spacing(1, 2),
-              transition: 'all 0.3s ease'
+              padding: theme.spacing(1, 2)
             }}
           >
             {item.name}
@@ -208,7 +207,7 @@ const Header = ({ currentView, setCurrentView, handleLogout, currentUser }) => {
             }}>
               <PeopleIcon />
             </IconButton>
-
+            {/* Popover */}
             <Popover
               open={Boolean(anchorEl)}
               anchorEl={anchorEl}
@@ -216,7 +215,7 @@ const Header = ({ currentView, setCurrentView, handleLogout, currentUser }) => {
               anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
               transformOrigin={{ vertical: 'top', horizontal: 'right' }}
             >
-              <Box sx={{ p: 2, width: 350 }}>
+              <Box sx={{ p: 2, width: 300 }}>
                 <Typography variant="h6" gutterBottom>User Management</Typography>
                 <List>
                   {users.map((user) => (
@@ -235,7 +234,7 @@ const Header = ({ currentView, setCurrentView, handleLogout, currentUser }) => {
                 </List>
               </Box>
             </Popover>
-
+            {/* Dialog */}
             <Dialog open={roleDialogOpen} onClose={handleClose}>
               <DialogTitle>Update User Role & Permissions</DialogTitle>
               <DialogContent>
@@ -246,19 +245,14 @@ const Header = ({ currentView, setCurrentView, handleLogout, currentUser }) => {
                   onChange={(e) => handleRoleChange(e.target.value)}
                   sx={{ mt: 2 }}
                 >
-                  <MenuItem value="admin">Admin (Full access)</MenuItem>
-                  <MenuItem value="editor">Editor (Read/Write)</MenuItem>
-                  <MenuItem value="viewer">Viewer (Read only)</MenuItem>
+                  <MenuItem value="admin">Admin</MenuItem>
+                  <MenuItem value="editor">Editor</MenuItem>
+                  <MenuItem value="viewer">Viewer</MenuItem>
                 </Select>
-
-                {/* ✅ Permission Checkboxes */}
                 <Box sx={{ mt: 3 }}>
-                  <Typography variant="subtitle2" sx={{ mb: 1 }}>Permissions</Typography>
                   {PERMISSION_OPTIONS.map((perm) => (
-                    <Box key={perm.resource} sx={{ mb: 1, pl: 1 }}>
-                      <Typography variant="body2" sx={{ fontWeight: 'bold' }}>
-                        {perm.resource}
-                      </Typography>
+                    <Box key={perm.resource} sx={{ mb: 1 }}>
+                      <Typography variant="body2" sx={{ fontWeight: 'bold' }}>{perm.resource}</Typography>
                       {perm.actions.map((action) => {
                         const checked = selectedUser?.permissions?.some(
                           p => p.resource === perm.resource && p.actions.includes(action)
@@ -301,35 +295,33 @@ const Header = ({ currentView, setCurrentView, handleLogout, currentUser }) => {
               </DialogContent>
               <DialogActions>
                 <Button onClick={handleClose}>Cancel</Button>
-                <Button variant="contained" onClick={handleRoleUpdate} color="primary">
-                  Update Role
-                </Button>
+                <Button variant="contained" onClick={handleRoleUpdate}>Update</Button>
               </DialogActions>
             </Dialog>
           </>
         )}
-
-        {/* User badge */}
-        <Box sx={{
-          display: 'flex',
-          alignItems: 'center',
-          backgroundColor: 'rgba(255, 255, 255, 0.1)',
-          borderRadius: '20px',
-          padding: '4px 12px',
-          marginRight: '8px'
-        }}>
-          <Typography variant="body2" sx={{ color: 'white', marginRight: '8px', textTransform: 'capitalize' }}>
-            {currentUser?.role}
-          </Typography>
-          <Avatar sx={{
-            width: 32, height: 32,
-            backgroundColor: currentUser?.role === 'admin' ? '#ff5722' :
-              currentUser?.role === 'editor' ? '#4caf50' : '#2196f3'
+        {/* Tooltip */}
+        <Tooltip title={currentUser?.username || ''} arrow>
+          <Box sx={{
+            display: 'flex',
+            alignItems: 'center',
+            backgroundColor: 'rgba(255, 255, 255, 0.1)',
+            borderRadius: '20px',
+            padding: '4px 12px',
+            cursor: 'pointer'
           }}>
-            {currentUser?.username?.charAt(0).toUpperCase()}
-          </Avatar>
-        </Box>
-
+            <Typography variant="body2" sx={{ color: 'white', mr: 1, textTransform: 'capitalize' }}>
+              {currentUser?.role}
+            </Typography>
+            <Avatar sx={{
+              width: 32, height: 32,
+              backgroundColor: currentUser?.role === 'admin' ? '#ff5722' :
+                currentUser?.role === 'editor' ? '#4caf50' : '#2196f3'
+            }}>
+              {currentUser?.username?.charAt(0).toUpperCase()}
+            </Avatar>
+          </Box>
+        </Tooltip>
         <IconButton onClick={handleLogout} sx={{
           color: 'white',
           backgroundColor: 'rgba(255, 255, 255, 0.1)',
@@ -342,7 +334,6 @@ const Header = ({ currentView, setCurrentView, handleLogout, currentUser }) => {
   );
 };
 
-// View components
 const HomeView = () => (
   <Box>
     <Typography variant="h4" gutterBottom sx={{ color: 'white' }}>
@@ -375,14 +366,12 @@ const ResourcesView = ({ currentUser }) => {
       setData([]);
       return;
     }
-
     setLoading(true);
     setError(null);
     try {
       const response = await api.get(
         `/api/k8s/${resourceType}${resourceType === 'pods' ? `?namespace=${namespace}` : ''}`
       );
-
       const formattedData = Array.isArray(response.data) ? response.data : [response.data];
       setData(formattedData);
     } catch (err) {
@@ -405,8 +394,8 @@ const ResourcesView = ({ currentUser }) => {
   };
 
   return (
-    <Box sx={{ p: 2 }}>
-      <Grid container spacing={2} alignItems="center" sx={{ mb: 3 }}>
+    <Box sx={{ p: { xs: 1, sm: 2 } }}>
+      <Grid container spacing={2} alignItems="center" sx={{ mb: 2 }}>
         <Grid item xs={12} md={4}>
           <MotionPaper>
             <Select
@@ -428,7 +417,6 @@ const ResourcesView = ({ currentUser }) => {
             </Select>
           </MotionPaper>
         </Grid>
-
         {['pods', 'deployments'].includes(resourceType) && (
           <Grid item xs={12} md={4}>
             <MotionPaper>
@@ -447,7 +435,6 @@ const ResourcesView = ({ currentUser }) => {
             </MotionPaper>
           </Grid>
         )}
-
         <Grid item>
           <IconButton onClick={fetchData} sx={{
             color: 'white',
@@ -458,13 +445,11 @@ const ResourcesView = ({ currentUser }) => {
           </IconButton>
         </Grid>
       </Grid>
-
-      {loading && <LinearProgress sx={{ height: 2, borderRadius: 5, mb: 3 }} />}
+      {loading && <LinearProgress sx={{ height: 2, borderRadius: 5, mb: 2 }} />}
       {error && <MotionPaper sx={{ p: 2, mb: 2 }}><Typography color="error">{error}</Typography></MotionPaper>}
-
       <MotionPaper>
         <TableContainer>
-          <Table sx={{ minWidth: 650 }}>
+          <Table>
             <TableHead>
               <TableRow sx={{ backgroundColor: 'rgba(255, 255, 255, 0.1)' }}>
                 {data[0] && Object.keys(data[0]).map((key) => (

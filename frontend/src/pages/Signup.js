@@ -1,16 +1,16 @@
 import React, { useState } from 'react';
 import { useNavigate, Link as RouterLink } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { 
-  TextField, 
-  Button, 
-  Typography, 
+import {
+  TextField,
+  Button,
+  Typography,
   Box,
   IconButton,
   InputAdornment,
   Link
 } from '@mui/material';
-import { 
+import {
   Person as UserIcon,
   Email as EmailIcon,
   VpnKey as PasswordIcon,
@@ -21,24 +21,22 @@ import {
 import { motion } from 'framer-motion';
 import { styled } from '@mui/material/styles';
 
-// Gradient background container
 const AuthContainer = styled(Box)(({ theme }) => ({
   minHeight: '100vh',
   background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'center',
-  padding: theme.spacing(3)
+  padding: theme.spacing(2)
 }));
 
-// Animated card component
 const AuthCard = styled(motion.div)(({ theme }) => ({
   backgroundColor: 'rgba(255, 255, 255, 0.1)',
   backdropFilter: 'blur(10px)',
   borderRadius: '16px',
   padding: theme.spacing(4),
   width: '100%',
-  maxWidth: '450px',
+  maxWidth: 420,
   boxShadow: '0 8px 32px rgba(0, 0, 0, 0.2)',
   border: '1px solid rgba(255, 255, 255, 0.2)'
 }));
@@ -66,21 +64,21 @@ const Signup = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
     if (formData.password !== formData.confirmPassword) {
       setError('Passwords do not match');
       return;
     }
 
     try {
-     await signup({
-       username: formData.username.trim(),
-       email: formData.email.trim(),
-       password: formData.password,
-       role: formData.role || 'viewer' // Default role for new users
-     });
+      await signup({
+        username: formData.username.trim(),
+        email: formData.email.trim(),
+        password: formData.password,
+        role: 'viewer'
+      });
+      navigate('/');
     } catch (err) {
-      setError(err.message || 'Signup failed. Please try again.');
+      setError(err.response?.data?.error || 'Signup failed. Please try again.');
     }
   };
 
@@ -114,17 +112,17 @@ const Signup = () => {
         </Box>
 
         {error && (
-          <motion.div 
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-          >
-            <Typography color="error" sx={{ 
-              mb: 2, 
-              textAlign: 'center',
-              backgroundColor: 'rgba(255,0,0,0.1)',
-              padding: 1,
-              borderRadius: 1
-            }}>
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+            <Typography
+              color="error"
+              sx={{
+                mb: 2,
+                textAlign: 'center',
+                backgroundColor: 'rgba(255,0,0,0.1)',
+                padding: 1,
+                borderRadius: 1
+              }}
+            >
               {error}
             </Typography>
           </motion.div>
@@ -139,9 +137,7 @@ const Signup = () => {
             value={formData.username}
             onChange={handleChange}
             InputProps={{
-              startAdornment: (
-                <UserIcon sx={{ color: 'rgba(255,255,255,0.7)', mr: 1 }} />
-              ),
+              startAdornment: <UserIcon sx={{ color: 'rgba(255,255,255,0.7)', mr: 1 }} />,
               sx: { color: 'white' }
             }}
             InputLabelProps={{ sx: { color: 'rgba(255,255,255,0.7)' } }}
@@ -162,9 +158,7 @@ const Signup = () => {
             value={formData.email}
             onChange={handleChange}
             InputProps={{
-              startAdornment: (
-                <EmailIcon sx={{ color: 'rgba(255,255,255,0.7)', mr: 1 }} />
-              ),
+              startAdornment: <EmailIcon sx={{ color: 'rgba(255,255,255,0.7)', mr: 1 }} />,
               sx: { color: 'white' }
             }}
             InputLabelProps={{ sx: { color: 'rgba(255,255,255,0.7)' } }}
@@ -185,9 +179,7 @@ const Signup = () => {
             value={formData.password}
             onChange={handleChange}
             InputProps={{
-              startAdornment: (
-                <PasswordIcon sx={{ color: 'rgba(255,255,255,0.7)', mr: 1 }} />
-              ),
+              startAdornment: <PasswordIcon sx={{ color: 'rgba(255,255,255,0.7)', mr: 1 }} />,
               endAdornment: (
                 <InputAdornment position="end">
                   <IconButton
@@ -219,9 +211,7 @@ const Signup = () => {
             value={formData.confirmPassword}
             onChange={handleChange}
             InputProps={{
-              startAdornment: (
-                <PasswordIcon sx={{ color: 'rgba(255,255,255,0.7)', mr: 1 }} />
-              ),
+              startAdornment: <PasswordIcon sx={{ color: 'rgba(255,255,255,0.7)', mr: 1 }} />,
               sx: { color: 'white' }
             }}
             InputLabelProps={{ sx: { color: 'rgba(255,255,255,0.7)' } }}
@@ -233,10 +223,7 @@ const Signup = () => {
             }}
           />
 
-          <motion.div 
-            whileHover={{ scale: 1.02 }} 
-            whileTap={{ scale: 0.98 }}
-          >
+          <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
             <Button
               fullWidth
               type="submit"
@@ -257,16 +244,12 @@ const Signup = () => {
           </motion.div>
         </Box>
 
-        <Typography sx={{ 
-          color: 'rgba(255,255,255,0.7)', 
-          textAlign: 'center',
-          mt: 2
-        }}>
+        <Typography sx={{ color: 'rgba(255,255,255,0.7)', textAlign: 'center', mt: 2 }}>
           Already have an account?{' '}
-          <Link 
+          <Link
             component={RouterLink}
-            to="/login" 
-            sx={{ 
+            to="/login"
+            sx={{
               color: 'white',
               fontWeight: 'bold',
               textDecoration: 'none',

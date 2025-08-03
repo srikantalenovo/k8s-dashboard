@@ -1,83 +1,71 @@
 import React, { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
-import { Link as RouterLink } from 'react-router-dom';
+import { useNavigate, Link as RouterLink } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { 
-  TextField, 
-  Button, 
-  Typography, 
+import {
+  TextField,
+  Button,
+  Typography,
   Box,
   IconButton,
-  InputAdornment
+  InputAdornment,
+  Link
 } from '@mui/material';
-import { 
+import {
   Email as EmailIcon,
   VpnKey as PasswordIcon,
-  Fingerprint as AuthIcon,
-  Login as LoginIcon,
+  LockOpen as LoginIcon,
   Visibility,
   VisibilityOff
 } from '@mui/icons-material';
 import { motion } from 'framer-motion';
 import { styled } from '@mui/material/styles';
 
-// Gradient background container
 const AuthContainer = styled(Box)(({ theme }) => ({
   minHeight: '100vh',
   background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'center',
-  padding: theme.spacing(3)
+  padding: theme.spacing(2)
 }));
 
-// Animated card component
 const AuthCard = styled(motion.div)(({ theme }) => ({
   backgroundColor: 'rgba(255, 255, 255, 0.1)',
   backdropFilter: 'blur(10px)',
   borderRadius: '16px',
   padding: theme.spacing(4),
   width: '100%',
-  maxWidth: '450px',
+  maxWidth: 420,
   boxShadow: '0 8px 32px rgba(0, 0, 0, 0.2)',
   border: '1px solid rgba(255, 255, 255, 0.2)'
 }));
 
 const Login = () => {
-  const [formData, setFormData] = useState({
-    email: '',
-    password: '',
-    showPassword: false
-  });
-  const { login, error, setError } = useAuth();
+  const [formData, setFormData] = useState({ email: '', password: '', showPassword: false });
+  const [error, setError] = useState('');
+  const { login } = useAuth();
   const navigate = useNavigate();
 
   const handleChange = (e) => {
-    const { name, value } = e.target;
-    setFormData({
-      ...formData,
-      [name]: value
-    });
-    if (error) setError('');
+    setFormData({ ...formData, [e.target.name]: e.target.value });
+    setError('');
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
       await login({
-        email: formData.email.trim(),  // Add trim() here
+        email: formData.email.trim(),
         password: formData.password
       });
+      navigate('/');
     } catch (err) {
-      console.error('Login error:', err);
+      setError(err.response?.data?.error || 'Login failed. Please try again.');
     }
   };
 
   const togglePasswordVisibility = () => {
-    setFormData({
-      ...formData,
-      showPassword: !formData.showPassword
-    });
+    setFormData({ ...formData, showPassword: !formData.showPassword });
   };
 
   return (
@@ -89,31 +77,31 @@ const Login = () => {
       >
         <Box sx={{ textAlign: 'center', mb: 3 }}>
           <motion.div
-            animate={{ rotate: [0, 10, -10, 0] }}
-            transition={{ duration: 1.5, repeat: Infinity, repeatType: "mirror" }}
+            animate={{ scale: [1, 1.05, 1] }}
+            transition={{ duration: 2, repeat: Infinity }}
           >
-            <AuthIcon sx={{ fontSize: 60, color: 'white' }} />
+            <LoginIcon sx={{ fontSize: 60, color: 'white' }} />
           </motion.div>
           <Typography variant="h4" sx={{ color: 'white', mt: 2, fontWeight: 'bold' }}>
-            Welcome Back
+            Sign In
           </Typography>
           <Typography sx={{ color: 'rgba(255,255,255,0.7)', mt: 1 }}>
-            Sign in to your GrepMind account
+            Welcome back to GrepMind
           </Typography>
         </Box>
 
         {error && (
-          <motion.div 
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-          >
-            <Typography color="error" sx={{ 
-              mb: 2, 
-              textAlign: 'center',
-              backgroundColor: 'rgba(255,0,0,0.1)',
-              padding: 1,
-              borderRadius: 1
-            }}>
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+            <Typography
+              color="error"
+              sx={{
+                mb: 2,
+                textAlign: 'center',
+                backgroundColor: 'rgba(255,0,0,0.1)',
+                padding: 1,
+                borderRadius: 1
+              }}
+            >
               {error}
             </Typography>
           </motion.div>
@@ -129,9 +117,7 @@ const Login = () => {
             value={formData.email}
             onChange={handleChange}
             InputProps={{
-              startAdornment: (
-                <EmailIcon sx={{ color: 'rgba(255,255,255,0.7)', mr: 1 }} />
-              ),
+              startAdornment: <EmailIcon sx={{ color: 'rgba(255,255,255,0.7)', mr: 1 }} />,
               sx: { color: 'white' }
             }}
             InputLabelProps={{ sx: { color: 'rgba(255,255,255,0.7)' } }}
@@ -152,16 +138,10 @@ const Login = () => {
             value={formData.password}
             onChange={handleChange}
             InputProps={{
-              startAdornment: (
-                <PasswordIcon sx={{ color: 'rgba(255,255,255,0.7)', mr: 1 }} />
-              ),
+              startAdornment: <PasswordIcon sx={{ color: 'rgba(255,255,255,0.7)', mr: 1 }} />,
               endAdornment: (
                 <InputAdornment position="end">
-                  <IconButton
-                    onClick={togglePasswordVisibility}
-                    edge="end"
-                    sx={{ color: 'rgba(255,255,255,0.7)' }}
-                  >
+                  <IconButton onClick={togglePasswordVisibility} edge="end" sx={{ color: 'rgba(255,255,255,0.7)' }}>
                     {formData.showPassword ? <VisibilityOff /> : <Visibility />}
                   </IconButton>
                 </InputAdornment>
@@ -177,10 +157,7 @@ const Login = () => {
             }}
           />
 
-          <motion.div 
-            whileHover={{ scale: 1.02 }} 
-            whileTap={{ scale: 0.98 }}
-          >
+          <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
             <Button
               fullWidth
               type="submit"
@@ -190,7 +167,7 @@ const Login = () => {
                 mt: 3,
                 mb: 2,
                 py: 1.5,
-                background: 'linear-gradient(45deg, #FE6B8B 30%, #FF8E53 90%)',
+                background: 'linear-gradient(45deg, #2196F3 30%, #21CBF3 90%)',
                 fontSize: '1rem',
                 fontWeight: 'bold',
                 borderRadius: '10px'
@@ -201,16 +178,12 @@ const Login = () => {
           </motion.div>
         </Box>
 
-        <Typography sx={{ 
-          color: 'rgba(255,255,255,0.7)', 
-          textAlign: 'center',
-          mt: 2
-        }}>
-          Don't have an account?{' '}
-          <Link 
+        <Typography sx={{ color: 'rgba(255,255,255,0.7)', textAlign: 'center', mt: 2 }}>
+          Don&apos;t have an account?{' '}
+          <Link
             component={RouterLink}
-            to="/signup" 
-            sx={{ 
+            to="/signup"
+            sx={{
               color: 'white',
               fontWeight: 'bold',
               textDecoration: 'none',
