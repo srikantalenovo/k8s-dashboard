@@ -32,6 +32,14 @@ buildpush:
 	docker push srikanta1219/grepmind-db:latest
 	docker push srikanta1219/grepmind-backend:latest
 	docker push srikanta1219/grepmind-frontend:latest
+	@echo "🔨 Removing image from local "
+	docker rmi srikanta1219/grepmind-db:latest
+	docker rmi srikanta1219/grepmind-backend:latest
+	docker rmi srikanta1219/grepmind-frontend:latest	
+
+	docker rmi k8s-dashboard_db:latest
+	docker rmi k8s-dashboard_backend:latest
+	docker rmi k8s-dashboard_frontend:latest
 
 # Start fresh containers
 up:

@@ -20,27 +20,28 @@ class K8sService {
     this.coreV1Api = this.kc.makeApiClient(CoreV1Api);
   }
 
-  async verifyClusterConnection() {
-    try {
-      logger.info('🔍 Verifying Kubernetes cluster connection...');
-      const nsRes = await this.coreV1Api.listNamespace();
+async verifyClusterConnection() {
+  try {
+    logger.info('🔍 Verifying Kubernetes cluster connection...');
+    const nsRes = await this.coreV1Api.listNamespace();
 
-      // Log raw API response
-      logger.debug('📥 Raw namespace API response:', JSON.stringify(nsRes.body, null, 2));
+    // Log the raw response for debugging
+    logger.info(`📦 Raw Namespace API response: ${JSON.stringify(nsRes.body, null, 2)}`);
 
-      if (!nsRes.body.items || nsRes.body.items.length === 0) {
-        throw new Error('Namespace list is empty or invalid');
-      }
-
-      logger.info(`🌐 Kubernetes mode: ${this.mode}`);
-      logger.info(`📡 API server: ${this.kc.getCurrentCluster()?.server || 'Unknown'}`);
-      logger.info(`✅ Found ${nsRes.body.items.length} namespaces`);
-      return true;
-    } catch (error) {
-      logger.error(`❌ Unable to connect to Kubernetes cluster: ${error.message}`, { stack: error.stack });
-      return false;
+    if (!nsRes.body || !Array.isArray(nsRes.body.items) || nsRes.body.items.length === 0) {
+      throw new Error('Namespace list is empty or invalid');
     }
+
+    logger.info(`🌐 Kubernetes mode: ${this.mode}`);
+    logger.info(`📡 API server: ${this.kc.getCurrentCluster()?.server || 'Unknown'}`);
+    logger.info(`✅ Found ${nsRes.body.items.length} namespaces`);
+    return true;
+  } catch (error) {
+    logger.error(`❌ Unable to connect to Kubernetes cluster: ${error.message}`);
+    return false;
   }
+}
+
 
   async getNamespaces() {
     const res = await this.coreV1Api.listNamespace();
