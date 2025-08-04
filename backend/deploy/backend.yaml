@@ -51,6 +51,7 @@ spec:
         app: grepmind-backend
     spec:
       serviceAccountName: grepmind-sa   # ✅ Use our admin SA
+      automountServiceAccountToken: true
       containers:
         - name: backend
           image: srikanta1219/grepmind-backend:v1

@@ -1,5 +1,6 @@
 import { KubeConfig, CoreV1Api } from '@kubernetes/client-node';
 import logger from '../utils/logger.js';
+import fs from 'fs/promises'; // Using fs promises API for async file operations
 
 class K8sService {
   constructor() {
@@ -7,10 +8,9 @@ class K8sService {
     this.coreV1Api = null;
     this.mode = 'unknown';
     this.initialized = false;
-    this.init();
   }
 
-  init() {
+  async init() {
     try {
       // Try in-cluster config first
       this.kc.loadFromCluster();
@@ -20,11 +20,8 @@ class K8sService {
       // Verify service account token is mounted (in-cluster only)
       if (this.mode === 'in-cluster') {
         try {
-          const fs = require('fs');
           const tokenPath = '/var/run/secrets/kubernetes.io/serviceaccount/token';
-          if (!fs.existsSync(tokenPath)) {
-            throw new Error('ServiceAccount token not mounted at expected location');
-          }
+          await fs.access(tokenPath);
           logger.info('🔑 Verified ServiceAccount token is mounted');
         } catch (tokenErr) {
           logger.error('❌ ServiceAccount token verification failed', {
@@ -50,17 +47,30 @@ class K8sService {
       }
     }
 
-    // Configure API client with proper timeout and retry settings
+    // Configure API client
     this.coreV1Api = this.kc.makeApiClient(CoreV1Api);
-    this.coreV1Api.defaults.timeout = 10000; // 10 second timeout
+    
+    // Add timeout configuration safely
+    if (this.coreV1Api && this.coreV1Api.defaults) {
+      this.coreV1Api.defaults.timeout = 10000; // 10 second timeout
+    } else {
+      logger.warn('⚠️ Could not set timeout for Kubernetes API client');
+    }
+    
     this.initialized = true;
   }
 
-  async verifyClusterConnection(retryCount = 3, retryDelay = 1000) {
+  async ensureInitialized() {
     if (!this.initialized) {
-      throw new Error('Kubernetes client not initialized');
+      await this.init();
     }
+    if (!this.coreV1Api) {
+      throw new Error('Kubernetes API client not initialized');
+    }
+  }
 
+  async verifyClusterConnection(retryCount = 3, retryDelay = 1000) {
+    await this.ensureInitialized();
     logger.info("🔍 Verifying Kubernetes cluster connection...");
     
     let lastError = null;
@@ -75,22 +85,13 @@ class K8sService {
         });
 
         if (namespaces.length === 0) {
-          // Additional diagnostic logging
-          const currentContext = this.kc.getCurrentContext();
-          const currentUser = this.kc.getCurrentUser();
-          const currentCluster = this.kc.getCurrentCluster();
-          
-          logger.warn("⚠️ Namespace list is empty - running diagnostics...", {
-            context: currentContext,
-            user: currentUser?.name,
-            cluster: currentCluster?.server,
-            serviceAccount: process.env.K8S_SERVICE_ACCOUNT || "grepmind-sa",
+          logger.warn("⚠️ Namespace list is empty", {
             attempt,
-            hint: 'Even with admin permissions, empty namespace list suggests API communication issue'
+            hint: 'This could indicate RBAC or API communication issues'
           });
 
           if (attempt === retryCount) {
-            throw new Error("Namespace list is empty or invalid (RBAC issue suspected)");
+            throw new Error("Namespace list is empty (RBAC or API issue suspected)");
           }
           
           await new Promise(resolve => setTimeout(resolve, retryDelay));
@@ -101,40 +102,18 @@ class K8sService {
         logger.info(`🌐 Kubernetes mode: ${this.mode}`);
         logger.info(`📡 API server: ${this.kc.getCurrentCluster()?.server || "Unknown"}`);
         logger.info(`✅ Found ${namespaces.length} namespaces`);
-        return {
-          connected: true,
-          mode: this.mode,
-          apiServer: this.kc.getCurrentCluster()?.server,
-          namespacesCount: namespaces.length
-        };
+        return true;
         
       } catch (error) {
         lastError = error;
         logger.warn(`⚠️ Connection attempt ${attempt} failed: ${error.message}`);
         
         if (attempt === retryCount) {
-          const errorDetails = {
-            stack: error.stack,
-            context: this.kc.getCurrentContext(),
-            user: this.kc.getCurrentUser()?.name,
-            cluster: this.kc.getCurrentCluster()?.server,
-            responseStatus: error.response?.statusCode,
-            responseBody: error.response?.body
-          };
-          
-          logger.error(`❌ Unable to connect to Kubernetes cluster after ${retryCount} attempts`, errorDetails);
-          
-          // Enhanced error message based on common issues
-          let enhancedMessage = error.message;
-          if (error.response?.statusCode === 403) {
-            enhancedMessage = "Forbidden (403) - Verify RBAC permissions for ServiceAccount";
-          } else if (error.code === 'ETIMEDOUT') {
-            enhancedMessage = "API server timeout - Check network connectivity to Kubernetes API";
-          } else if (error.response?.statusCode === 401) {
-            enhancedMessage = "Unauthorized (401) - Verify ServiceAccount token is valid";
-          }
-          
-          throw new Error(`Kubernetes connection failed: ${enhancedMessage}`);
+          logger.error(`❌ Unable to connect to Kubernetes cluster after ${retryCount} attempts`, { 
+            error: error.message,
+            stack: error.stack
+          });
+          throw error;
         }
         
         await new Promise(resolve => setTimeout(resolve, retryDelay));
@@ -248,5 +227,11 @@ class K8sService {
 }
 
 // Singleton export
+// Initialize and export as singleton
 const k8sService = new K8sService();
+await k8sService.init().catch(err => {
+  logger.error('❌ Failed to initialize Kubernetes service', { error: err.message });
+  process.exit(1);
+});
+
 export default k8sService;
