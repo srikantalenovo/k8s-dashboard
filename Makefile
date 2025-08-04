@@ -64,8 +64,8 @@ backend:
 	@echo "🔨 Building backend images..."
 	docker-compose build --no-cache backend
 	@echo "🔨 tag fresh images..."
-	docker tag k8s-dashboard_backend:latest srikanta1219/grepmind-backend:latest
+	docker tag k8s-dashboard_backend:latest srikanta1219/grepmind-backend:v1
 	@echo "🔨 Publish image to dockerhub "
-	docker push srikanta1219/grepmind-backend:latest
+	docker push srikanta1219/grepmind-backend:v1
 	@echo "🔨 Removing image from local "
-	docker rmi srikanta1219/grepmind-backend:latest
+	docker rmi srikanta1219/grepmind-backend:v1
