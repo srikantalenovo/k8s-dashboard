@@ -45,3 +45,27 @@ buildpush:
 up:
 	@echo "▶️ Starting containers..."
 	docker-compose -f $(COMPOSE_FILE) up --force-recreate
+
+
+# Just build without cache
+frontend:
+	@echo "🔨 Building frontend images..."
+	docker-compose build --no-cache frontend
+	@echo "🔨 tag fresh images..."
+	docker tag k8s-dashboard_frontend:latest srikanta1219/grepmind-frontend:latest
+	@echo "🔨 Publish image to dockerhub "
+	docker push srikanta1219/grepmind-frontend:latest
+	@echo "🔨 Removing image from local "
+	docker rmi srikanta1219/grepmind-frontend:latest
+
+
+# Just build without cache
+backend:
+	@echo "🔨 Building backend images..."
+	docker-compose build --no-cache backend
+	@echo "🔨 tag fresh images..."
+	docker tag k8s-dashboard_backend:latest srikanta1219/grepmind-backend:latest
+	@echo "🔨 Publish image to dockerhub "
+	docker push srikanta1219/grepmind-backend:latest
+	@echo "🔨 Removing image from local "
+	docker rmi srikanta1219/grepmind-backend:latest
