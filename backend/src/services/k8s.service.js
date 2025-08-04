@@ -44,6 +44,7 @@ async verifyClusterConnection() {
 
 
 
+
   async getNamespaces() {
     const res = await this.coreV1Api.listNamespace();
     return res.body.items.map(ns => ns.metadata.name);
