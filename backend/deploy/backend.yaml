@@ -39,6 +39,7 @@ spec:
       containers:
         - name: backend
           image: srikanta1219/grepmind-backend:v1
+          imagePullPolicy: Always
           ports:
             - containerPort: 5000
           env:
