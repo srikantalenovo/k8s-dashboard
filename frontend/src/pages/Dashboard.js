@@ -354,7 +354,7 @@ const AnalyzerView = () => (
 );
 // ResourcesView Starting
 
-// Line ~210 in Dashboard.js — Replace the whole ResourcesView with this
+// ResourcesView Component
 const ResourcesView = ({ currentUser }) => {
   const [resourceType, setResourceType] = useState('nodes');
   const [namespace, setNamespace] = useState('default');
@@ -362,6 +362,16 @@ const ResourcesView = ({ currentUser }) => {
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+
+  // Helper function to format table cell values
+  const formatValue = (value) => {
+    if (value === null || value === undefined) return '';
+    if (typeof value === 'object') {
+      const str = JSON.stringify(value);
+      return str === '{}' ? '' : str;
+    }
+    return String(value);
+  };
 
   // Fetch namespaces from backend
   const fetchNamespaces = async () => {
@@ -384,7 +394,7 @@ const ResourcesView = ({ currentUser }) => {
     setError(null);
     try {
       let url = `/api/k8s/${resourceType}`;
-      if (resourceType === 'pods') {
+      if (namespace && resourceConfig[resourceType]?.namespaced) {
         url += `?namespace=${namespace}`;
       }
       const res = await api.get(url);
@@ -406,11 +416,22 @@ const ResourcesView = ({ currentUser }) => {
     fetchData();
   }, [resourceType, namespace, currentUser]);
 
+  // Extended resource list with namespaced property
   const resourceConfig = {
-    nodes: { icon: <NodeIcon sx={{ color: '#4caf50' }} />, label: 'Nodes' },
-    namespaces: { icon: <NamespaceIcon sx={{ color: '#2196f3' }} />, label: 'Namespaces' },
-    pods: { icon: <PodIcon sx={{ color: '#9c27b0' }} />, label: 'Pods' },
-    deployments: { icon: <AppsIcon sx={{ color: '#ff9800' }} />, label: 'Deployments' }
+    nodes: { icon: <NodeIcon sx={{ color: '#4caf50' }} />, label: 'Nodes', namespaced: false },
+    namespaces: { icon: <NamespaceIcon sx={{ color: '#2196f3' }} />, label: 'Namespaces', namespaced: false },
+    pods: { icon: <PodIcon sx={{ color: '#9c27b0' }} />, label: 'Pods', namespaced: true },
+    deployments: { icon: <AppsIcon sx={{ color: '#ff9800' }} />, label: 'Deployments', namespaced: true },
+    services: { icon: <StorageIcon sx={{ color: '#03a9f4' }} />, label: 'Services', namespaced: true },
+    configmaps: { icon: <StorageIcon sx={{ color: '#8bc34a' }} />, label: 'ConfigMaps', namespaced: true },
+    secrets: { icon: <StorageIcon sx={{ color: '#f44336' }} />, label: 'Secrets', namespaced: true },
+    daemonsets: { icon: <StorageIcon sx={{ color: '#ff5722' }} />, label: 'DaemonSets', namespaced: true },
+    statefulsets: { icon: <StorageIcon sx={{ color: '#673ab7' }} />, label: 'StatefulSets', namespaced: true },
+    jobs: { icon: <StorageIcon sx={{ color: '#795548' }} />, label: 'Jobs', namespaced: true },
+    cronjobs: { icon: <StorageIcon sx={{ color: '#009688' }} />, label: 'CronJobs', namespaced: true },
+    ingresses: { icon: <StorageIcon sx={{ color: '#607d8b' }} />, label: 'Ingresses', namespaced: true },
+    persistentvolumeclaims: { icon: <StorageIcon sx={{ color: '#cddc39' }} />, label: 'PVCs', namespaced: true },
+    persistentvolumes: { icon: <StorageIcon sx={{ color: '#ffc107' }} />, label: 'PVs', namespaced: false }
   };
 
   return (
@@ -439,8 +460,8 @@ const ResourcesView = ({ currentUser }) => {
           </MotionPaper>
         </Grid>
 
-        {/* Namespace Selector - only show for pods */}
-        {resourceType === 'pods' && (
+        {/* Namespace Selector - show if resource is namespaced */}
+        {resourceConfig[resourceType]?.namespaced && (
           <Grid item xs={12} md={4}>
             <MotionPaper>
               <Select
@@ -480,7 +501,7 @@ const ResourcesView = ({ currentUser }) => {
         <TableContainer>
           <Table>
             <TableHead>
-              <TableRow sx={{ backgroundColor: 'rgba(255, 255, 255, 0.1)' }}>
+              <TableRow sx={{ backgroundColor: '#3949ab' }}>
                 {data[0] && Object.keys(data[0]).map((key) => (
                   <TableCell key={key} sx={{ color: '#fff', fontWeight: 'bold' }}>
                     {key.toUpperCase()}
@@ -493,7 +514,7 @@ const ResourcesView = ({ currentUser }) => {
                 <TableRow key={index} sx={{ '&:hover': { backgroundColor: 'rgba(255, 255, 255, 0.03)' } }}>
                   {Object.values(item).map((value, idx) => (
                     <TableCell key={idx} sx={{ color: 'rgba(255, 255, 255, 0.8)' }}>
-                      {typeof value === 'object' ? JSON.stringify(value) : String(value)}
+                      {formatValue(value)}
                     </TableCell>
                   ))}
                 </TableRow>
@@ -505,7 +526,6 @@ const ResourcesView = ({ currentUser }) => {
     </Box>
   );
 };
-
 
 
 // ResourcesView ending
