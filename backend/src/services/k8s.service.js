@@ -25,15 +25,24 @@ async verifyClusterConnection() {
     logger.info("🔍 Verifying Kubernetes cluster connection...");
 
     const nsRes = await this.coreV1Api.listNamespace();
-    logger.info("📦 Raw Namespace API response (full):", JSON.stringify(nsRes, null, 2));
 
-    if (!nsRes || !nsRes.body || !Array.isArray(nsRes.body.items) || nsRes.body.items.length === 0) {
+    // Explicit parse
+    let namespaces;
+    if (typeof nsRes.body === 'string') {
+      namespaces = JSON.parse(nsRes.body);
+    } else {
+      namespaces = nsRes.body;
+    }
+
+    logger.info("📦 Parsed Namespace API response:", namespaces);
+
+    if (!namespaces || !Array.isArray(namespaces.items) || namespaces.items.length === 0) {
       throw new Error('Namespace list is empty or invalid');
     }
 
     logger.info(`🌐 Kubernetes mode: ${this.mode}`);
     logger.info(`📡 API server: ${this.kc.getCurrentCluster()?.server || 'Unknown'}`);
-    logger.info(`✅ Found ${nsRes.body.items.length} namespaces`);
+    logger.info(`✅ Found ${namespaces.items.length} namespaces`);
 
     return true;
   } catch (error) {
@@ -41,6 +50,7 @@ async verifyClusterConnection() {
     return false;
   }
 }
+
 
 
 
