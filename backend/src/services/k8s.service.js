@@ -22,25 +22,26 @@ class K8sService {
 
 async verifyClusterConnection() {
   try {
-    logger.info('🔍 Verifying Kubernetes cluster connection...');
+    logger.info("🔍 Verifying Kubernetes cluster connection...");
+
     const nsRes = await this.coreV1Api.listNamespace();
+    logger.info("📦 Raw Namespace API response (full):", JSON.stringify(nsRes, null, 2));
 
-    // Log the raw response for debugging
-    logger.info(`📦 Raw Namespace API response: ${JSON.stringify(nsRes.body, null, 2)}`);
-
-    if (!nsRes.body || !Array.isArray(nsRes.body.items) || nsRes.body.items.length === 0) {
+    if (!nsRes || !nsRes.body || !Array.isArray(nsRes.body.items) || nsRes.body.items.length === 0) {
       throw new Error('Namespace list is empty or invalid');
     }
 
     logger.info(`🌐 Kubernetes mode: ${this.mode}`);
     logger.info(`📡 API server: ${this.kc.getCurrentCluster()?.server || 'Unknown'}`);
     logger.info(`✅ Found ${nsRes.body.items.length} namespaces`);
+
     return true;
   } catch (error) {
     logger.error(`❌ Unable to connect to Kubernetes cluster: ${error.message}`);
     return false;
   }
 }
+
 
 
   async getNamespaces() {
