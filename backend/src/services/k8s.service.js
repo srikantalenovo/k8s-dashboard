@@ -26,32 +26,27 @@ async verifyClusterConnection() {
 
     const nsRes = await this.coreV1Api.listNamespace();
 
-    // Explicit parse
-    let namespaces;
-    if (typeof nsRes.body === 'string') {
-      namespaces = JSON.parse(nsRes.body);
-    } else {
-      namespaces = nsRes.body;
-    }
+    // Log the raw parsed response length
+    const namespaces = nsRes?.body?.items || [];
+    logger.info(`📦 Parsed Namespace API response count: ${namespaces.length}`, { timestamp: new Date().toISOString() });
 
-    logger.info("📦 Parsed Namespace API response:", namespaces);
-
-    if (!namespaces || !Array.isArray(namespaces.items) || namespaces.items.length === 0) {
-      throw new Error('Namespace list is empty or invalid');
+    if (namespaces.length === 0) {
+      logger.error("❌ Namespace list is empty — this usually means RBAC is misconfigured for the ServiceAccount.", {
+        hint: "Check if the ServiceAccount has permission to list namespaces at cluster scope (ClusterRole + ClusterRoleBinding).",
+        sa: process.env.K8S_SERVICE_ACCOUNT || "grepmind-sa",
+      });
+      throw new Error("Namespace list is empty or invalid (RBAC issue suspected)");
     }
 
     logger.info(`🌐 Kubernetes mode: ${this.mode}`);
-    logger.info(`📡 API server: ${this.kc.getCurrentCluster()?.server || 'Unknown'}`);
-    logger.info(`✅ Found ${namespaces.items.length} namespaces`);
-
+    logger.info(`📡 API server: ${this.kc.getCurrentCluster()?.server || "Unknown"}`);
+    logger.info(`✅ Found ${namespaces.length} namespaces`);
     return true;
   } catch (error) {
-    logger.error(`❌ Unable to connect to Kubernetes cluster: ${error.message}`);
+    logger.error(`❌ Unable to connect to Kubernetes cluster: ${error.message}`, { stack: error.stack });
     return false;
   }
 }
-
-
 
 
 
