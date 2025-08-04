@@ -377,7 +377,7 @@ const ResourcesView = ({ currentUser }) => {
   const fetchNamespaces = async () => {
     try {
       const res = await api.get('/api/k8s/namespaces');
-      setNamespaces(res.data || []);
+      setNamespaces((res.data || []).map(ns => (typeof ns === 'string' ? ns : ns.name)));
     } catch (err) {
       console.error('Error fetching namespaces:', err);
     }
