@@ -354,7 +354,6 @@ const AnalyzerView = () => (
 );
 // ResourcesView Starting
 
-// ResourcesView Component
 const ResourcesView = ({ currentUser }) => {
   const [resourceType, setResourceType] = useState('nodes');
   const [namespace, setNamespace] = useState('default');
@@ -363,14 +362,21 @@ const ResourcesView = ({ currentUser }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  // Helper function to format table cell values
-  const formatValue = (value) => {
-    if (value === null || value === undefined) return '';
-    if (typeof value === 'object') {
-      const str = JSON.stringify(value);
-      return str === '{}' ? '' : str;
-    }
-    return String(value);
+  // Resources list & config
+  const resourceConfig = {
+    nodes: { label: 'Nodes', namespaced: false },
+    namespaces: { label: 'Namespaces', namespaced: false },
+    pods: { label: 'Pods', namespaced: true },
+    deployments: { label: 'Deployments', namespaced: true },
+    services: { label: 'Services', namespaced: true },
+    configmaps: { label: 'ConfigMaps', namespaced: true },
+    secrets: { label: 'Secrets', namespaced: true },
+    statefulsets: { label: 'StatefulSets', namespaced: true },
+    daemonsets: { label: 'DaemonSets', namespaced: true },
+    jobs: { label: 'Jobs', namespaced: true },
+    cronjobs: { label: 'CronJobs', namespaced: true },
+    persistentvolumeclaims: { label: 'PVCs', namespaced: true },
+    persistentvolumes: { label: 'PVs', namespaced: false }
   };
 
   // Fetch namespaces from backend
@@ -383,18 +389,19 @@ const ResourcesView = ({ currentUser }) => {
     }
   };
 
-  // Fetch data based on selected resource type & namespace
+  // Fetch data based on resourceType
   const fetchData = async () => {
     if (!hasPermission(currentUser, resourceType, 'read')) {
       setError('You do not have permission to view this resource');
       setData([]);
       return;
     }
+
     setLoading(true);
     setError(null);
     try {
       let url = `/api/k8s/${resourceType}`;
-      if (namespace && resourceConfig[resourceType]?.namespaced) {
+      if (resourceConfig[resourceType]?.namespaced) {
         url += `?namespace=${namespace}`;
       }
       const res = await api.get(url);
@@ -416,28 +423,10 @@ const ResourcesView = ({ currentUser }) => {
     fetchData();
   }, [resourceType, namespace, currentUser]);
 
-  // Extended resource list with namespaced property
-  const resourceConfig = {
-    nodes: { icon: <NodeIcon sx={{ color: '#4caf50' }} />, label: 'Nodes', namespaced: false },
-    namespaces: { icon: <NamespaceIcon sx={{ color: '#2196f3' }} />, label: 'Namespaces', namespaced: false },
-    pods: { icon: <PodIcon sx={{ color: '#9c27b0' }} />, label: 'Pods', namespaced: true },
-    deployments: { icon: <AppsIcon sx={{ color: '#ff9800' }} />, label: 'Deployments', namespaced: true },
-    services: { icon: <StorageIcon sx={{ color: '#03a9f4' }} />, label: 'Services', namespaced: true },
-    configmaps: { icon: <StorageIcon sx={{ color: '#8bc34a' }} />, label: 'ConfigMaps', namespaced: true },
-    secrets: { icon: <StorageIcon sx={{ color: '#f44336' }} />, label: 'Secrets', namespaced: true },
-    daemonsets: { icon: <StorageIcon sx={{ color: '#ff5722' }} />, label: 'DaemonSets', namespaced: true },
-    statefulsets: { icon: <StorageIcon sx={{ color: '#673ab7' }} />, label: 'StatefulSets', namespaced: true },
-    jobs: { icon: <StorageIcon sx={{ color: '#795548' }} />, label: 'Jobs', namespaced: true },
-    cronjobs: { icon: <StorageIcon sx={{ color: '#009688' }} />, label: 'CronJobs', namespaced: true },
-    ingresses: { icon: <StorageIcon sx={{ color: '#607d8b' }} />, label: 'Ingresses', namespaced: true },
-    persistentvolumeclaims: { icon: <StorageIcon sx={{ color: '#cddc39' }} />, label: 'PVCs', namespaced: true },
-    persistentvolumes: { icon: <StorageIcon sx={{ color: '#ffc107' }} />, label: 'PVs', namespaced: false }
-  };
-
   return (
     <Box sx={{ p: { xs: 1, sm: 2 } }}>
       <Grid container spacing={2} alignItems="center" sx={{ mb: 2 }}>
-        {/* Resource Type Selector */}
+        {/* Resource Selector */}
         <Grid item xs={12} md={4}>
           <MotionPaper>
             <Select
@@ -448,19 +437,16 @@ const ResourcesView = ({ currentUser }) => {
             >
               {Object.entries(resourceConfig)
                 .filter(([key]) => hasPermission(currentUser, key, 'read'))
-                .map(([key, { icon, label }]) => (
+                .map(([key, { label }]) => (
                   <MenuItem key={key} value={key} sx={{ color: '#333' }}>
-                    <Box display="flex" alignItems="center">
-                      {icon}
-                      <Typography ml={1}>{label}</Typography>
-                    </Box>
+                    {label}
                   </MenuItem>
                 ))}
             </Select>
           </MotionPaper>
         </Grid>
 
-        {/* Namespace Selector - show if resource is namespaced */}
+        {/* Namespace Selector (only for namespaced resources) */}
         {resourceConfig[resourceType]?.namespaced && (
           <Grid item xs={12} md={4}>
             <MotionPaper>
@@ -480,33 +466,39 @@ const ResourcesView = ({ currentUser }) => {
 
         {/* Refresh Button */}
         <Grid item>
-          <IconButton onClick={fetchData} sx={{
-            color: 'white',
-            backgroundColor: 'rgba(255, 255, 255, 0.1)',
-            '&:hover': { backgroundColor: 'rgba(255, 255, 255, 0.2)' }
-          }}>
+          <IconButton
+            onClick={fetchData}
+            sx={{
+              color: 'white',
+              backgroundColor: 'rgba(255, 255, 255, 0.1)',
+              '&:hover': { backgroundColor: 'rgba(255, 255, 255, 0.2)' }
+            }}
+          >
             <RefreshIcon />
           </IconButton>
         </Grid>
       </Grid>
 
-      {/* Loading & Errors */}
+      {/* Loading / Error */}
       {loading && <LinearProgress sx={{ height: 2, borderRadius: 5, mb: 2 }} />}
-      {error && <MotionPaper sx={{ p: 2, mb: 2 }}>
-        <Typography color="error">{error}</Typography>
-      </MotionPaper>}
+      {error && (
+        <MotionPaper sx={{ p: 2, mb: 2 }}>
+          <Typography color="error">{error}</Typography>
+        </MotionPaper>
+      )}
 
       {/* Data Table */}
       <MotionPaper>
         <TableContainer>
           <Table>
             <TableHead>
-              <TableRow sx={{ backgroundColor: '#3949ab' }}>
-                {data[0] && Object.keys(data[0]).map((key) => (
-                  <TableCell key={key} sx={{ color: '#fff', fontWeight: 'bold' }}>
-                    {key.toUpperCase()}
-                  </TableCell>
-                ))}
+              <TableRow sx={{ backgroundColor: 'rgba(255, 255, 255, 0.1)' }}>
+                {data[0] &&
+                  Object.keys(data[0]).map((key) => (
+                    <TableCell key={key} sx={{ color: '#fff', fontWeight: 'bold' }}>
+                      {key.toUpperCase()}
+                    </TableCell>
+                  ))}
               </TableRow>
             </TableHead>
             <TableBody>
@@ -514,7 +506,7 @@ const ResourcesView = ({ currentUser }) => {
                 <TableRow key={index} sx={{ '&:hover': { backgroundColor: 'rgba(255, 255, 255, 0.03)' } }}>
                   {Object.values(item).map((value, idx) => (
                     <TableCell key={idx} sx={{ color: 'rgba(255, 255, 255, 0.8)' }}>
-                      {formatValue(value)}
+                      {typeof value === 'object' ? JSON.stringify(value) : String(value)}
                     </TableCell>
                   ))}
                 </TableRow>
@@ -526,6 +518,7 @@ const ResourcesView = ({ currentUser }) => {
     </Box>
   );
 };
+
 
 
 // ResourcesView ending
