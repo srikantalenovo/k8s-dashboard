@@ -48,7 +48,7 @@ up:
 
 
 # Just build without cache
-frontend:
+build-frontend:
 	@echo "🔨 Building frontend images..."
 	docker-compose build --no-cache frontend
 	@echo "🔨 tag fresh images..."
@@ -60,7 +60,7 @@ frontend:
 
 
 # Just build without cache
-backend:
+build-backend:
 	@echo "🔨 Building backend images..."
 	docker-compose build --no-cache backend
 	@echo "🔨 tag fresh images..."
