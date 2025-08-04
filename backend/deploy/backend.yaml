@@ -38,7 +38,7 @@ spec:
       serviceAccountName: grepmind-sa   # ✅ Use our admin SA
       containers:
         - name: backend
-          image: srikanta1219/grepmind-backend:latest
+          image: srikanta1219/grepmind-backend:v1
           ports:
             - containerPort: 5000
           env:
