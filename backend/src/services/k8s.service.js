@@ -1,4 +1,4 @@
-import { KubeConfig, CoreV1Api, AppsV1Api, NetworkingV1Api } from '@kubernetes/client-node';
+import { KubeConfig, CoreV1Api, AppsV1Api, NetworkingV1Api, BatchV1Api } from '@kubernetes/client-node';
 import logger from '../utils/logger.js';
 import fs from 'fs/promises'; // Using fs promises API for async file operations
 
