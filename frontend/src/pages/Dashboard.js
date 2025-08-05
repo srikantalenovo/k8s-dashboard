@@ -409,7 +409,12 @@ const ResourcesView = ({ currentUser }) => {
       label: 'Secrets', 
       namespaced: true,
       apiPath: 'secrets' 
-    }
+    },
+    ingresses: { 
+      label: 'Ingresses', 
+      namespaced: true,
+      apiPath: 'ingresses' 
+    }    
   };
 
   const fetchNamespaces = async () => {
