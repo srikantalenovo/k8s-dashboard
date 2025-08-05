@@ -1,4 +1,4 @@
-import { KubeConfig, CoreV1Api, AppsV1Api, NetworkingV1Api, BatchV1Api } from '@kubernetes/client-node';
+import { KubeConfig, CoreV1Api, AppsV1Api, NetworkingV1Api, BatchV1beta1Api, BatchV1Api } from '@kubernetes/client-node';
 import logger from '../utils/logger.js';
 import fs from 'fs/promises'; // Using fs promises API for async file operations
 
@@ -7,7 +7,8 @@ class K8sService {
     this.kc = new KubeConfig();
     this.coreV1Api = null;
     this.appsV1Api = null;
-    this.networkingV1Api = null;
+    this.networkingV1Api = null;    
+    this.batchV1beta1Api = null;
     this.batchV1Api = null;
     this.mode = 'unknown';
     this.initialized = false;
@@ -53,10 +54,17 @@ class K8sService {
     // Configure API client
     this.coreV1Api = this.kc.makeApiClient(CoreV1Api);
     this.appsV1Api = this.kc.makeApiClient(AppsV1Api);
-    this.batchV1Api = this.kc.makeApiClient(BatchV1Api);  
+    this.batchV1Api = this.kc.makeApiClient(BatchV1Api);
+    this.batchV1beta1Api = this.kc.makeApiClient(BatchV1beta1Api);
+    this.networkingV1Api = this.kc.makeApiClient(NetworkingV1Api);
+      
     // Add timeout configuration safely
     if (this.coreV1Api && this.coreV1Api.defaults) {
-      this.coreV1Api.defaults.timeout = 10000; // 10 second timeout
+      const timeout = 10000; // 10 second timeout
+      this.coreV1Api.defaults.timeout = timeout;
+      this.appsV1Api.defaults.timeout = timeout;
+      this.batchV1Api.defaults.timeout = timeout;
+      this.batchV1beta1Api.defaults.timeout = timeout;
     } else {
       logger.warn('⚠️ Could not set timeout for Kubernetes API client');
     }
@@ -245,13 +253,19 @@ class K8sService {
   async getServices(namespace = 'default') {
     await this.verifyClusterConnection();
     const res = await this.coreV1Api.listNamespacedService(namespace);
-    return res.body.items.map(s => ({
-      name: s.metadata.name,
-      namespace: s.metadata.namespace,
-      type: s.spec.type,
-      clusterIP: s.spec.clusterIP,
-      ports: s.spec.ports || [],
-      creationTimestamp: s.metadata.creationTimestamp
+    return res.body.items.map(svc => ({
+      name: svc.metadata.name,
+      namespace: svc.metadata.namespace,
+      type: svc.spec.type,
+      clusterIP: svc.spec.clusterIP,
+      externalIPs: svc.spec.externalIPs || [],
+      ports: svc.spec.ports?.map(p => ({
+        name: p.name,
+        port: p.port,
+        protocol: p.protocol,
+        targetPort: p.targetPort
+      })) || [],
+      creationTimestamp: svc.metadata.creationTimestamp
     }));
   }
 
@@ -262,7 +276,8 @@ class K8sService {
     return res.body.items.map(cm => ({
       name: cm.metadata.name,
       namespace: cm.metadata.namespace,
-      dataKeys: cm.data ? Object.keys(cm.data) : [],
+      dataKeys: Object.keys(cm.data || {}),
+      binaryDataKeys: Object.keys(cm.binaryData || {}),
       creationTimestamp: cm.metadata.creationTimestamp
     }));
   }
@@ -271,23 +286,68 @@ class K8sService {
   async getSecrets(namespace = 'default') {
     await this.verifyClusterConnection();
     const res = await this.coreV1Api.listNamespacedSecret(namespace);
-    return res.body.items.map(sec => ({
-      name: sec.metadata.name,
-      namespace: sec.metadata.namespace,
-      type: sec.type,
-      creationTimestamp: sec.metadata.creationTimestamp
+    return res.body.items.map(secret => ({
+      name: secret.metadata.name,
+      namespace: secret.metadata.namespace,
+      type: secret.type,
+      dataKeys: Object.keys(secret.data || {}),
+      creationTimestamp: secret.metadata.creationTimestamp
     }));
   }
 
   // StatefulSets
+  async getPersistentVolumes() {
+    await this.verifyClusterConnection();
+    const res = await this.coreV1Api.listPersistentVolume();
+    return res.body.items.map(pv => ({
+      name: pv.metadata.name,
+      status: pv.status.phase,
+      capacity: pv.spec.capacity?.storage,
+      storageClass: pv.spec.storageClassName,
+      accessModes: pv.spec.accessModes,
+      reclaimPolicy: pv.spec.persistentVolumeReclaimPolicy,
+      creationTimestamp: pv.metadata.creationTimestamp
+    }));
+  }
+
+  async getPersistentVolumeClaims(namespace = 'default') {
+    await this.verifyClusterConnection();
+    const res = await this.coreV1Api.listNamespacedPersistentVolumeClaim(namespace);
+    return res.body.items.map(pvc => ({
+      name: pvc.metadata.name,
+      namespace: pvc.metadata.namespace,
+      status: pvc.status.phase,
+      volumeName: pvc.spec.volumeName,
+      storageClass: pvc.spec.storageClassName,
+      capacity: pvc.status.capacity?.storage,
+      accessModes: pvc.spec.accessModes,
+      creationTimestamp: pvc.metadata.creationTimestamp
+    }));
+  }
+
+  // Apps Resources
+  async getDeployments(namespace = 'default') {
+    await this.verifyClusterConnection();
+    const res = await this.appsV1Api.listNamespacedDeployment(namespace);
+    return res.body.items.map(deploy => ({
+      name: deploy.metadata.name,
+      namespace: deploy.metadata.namespace,
+      replicas: deploy.status.replicas || 0,
+      readyReplicas: deploy.status.readyReplicas || 0,
+      availableReplicas: deploy.status.availableReplicas || 0,
+      strategy: deploy.spec.strategy?.type || 'RollingUpdate',
+      creationTimestamp: deploy.metadata.creationTimestamp
+    }));
+  }  
   async getStatefulSets(namespace = 'default') {
     await this.verifyClusterConnection();
     const res = await this.appsV1Api.listNamespacedStatefulSet(namespace);
     return res.body.items.map(ss => ({
       name: ss.metadata.name,
       namespace: ss.metadata.namespace,
-      replicas: ss.spec.replicas,
+      replicas: ss.status.replicas || 0,
       readyReplicas: ss.status.readyReplicas || 0,
+      serviceName: ss.spec.serviceName,
       creationTimestamp: ss.metadata.creationTimestamp
     }));
   }
@@ -299,13 +359,14 @@ class K8sService {
     return res.body.items.map(ds => ({
       name: ds.metadata.name,
       namespace: ds.metadata.namespace,
+      currentNumberScheduled: ds.status.currentNumberScheduled,
       desiredNumberScheduled: ds.status.desiredNumberScheduled,
       numberReady: ds.status.numberReady,
       creationTimestamp: ds.metadata.creationTimestamp
     }));
   }
 
-  // Jobs
+  // Batch Resources
   async getJobs(namespace = 'default') {
     await this.verifyClusterConnection();
     const res = await this.batchV1Api.listNamespacedJob(namespace);
@@ -313,37 +374,26 @@ class K8sService {
       name: job.metadata.name,
       namespace: job.metadata.namespace,
       completions: job.spec.completions,
+      parallelism: job.spec.parallelism,
       succeeded: job.status.succeeded || 0,
-      startTime: job.status.startTime,
-      completionTime: job.status.completionTime
+      active: job.status.active || 0,
+      creationTimestamp: job.metadata.creationTimestamp
     }));
   }
 
   // CronJobs
   async getCronJobs(namespace = 'default') {
     await this.verifyClusterConnection();
-    const res = await this.batchV1Api.listNamespacedCronJob(namespace);
+    const res = await this.batchV1beta1Api.listNamespacedCronJob(namespace);
     return res.body.items.map(cj => ({
       name: cj.metadata.name,
       namespace: cj.metadata.namespace,
       schedule: cj.spec.schedule,
-      suspend: cj.spec.suspend || false,
+      lastScheduleTime: cj.status.lastScheduleTime,
       creationTimestamp: cj.metadata.creationTimestamp
     }));
   }
 
-  // PersistentVolumeClaims
-  async getPersistentVolumeClaims(namespace = 'default') {
-    await this.verifyClusterConnection();
-    const res = await this.coreV1Api.listNamespacedPersistentVolumeClaim(namespace);
-    return res.body.items.map(pvc => ({
-      name: pvc.metadata.name,
-      namespace: pvc.metadata.namespace,
-      status: pvc.status.phase,
-      storage: pvc.spec.resources.requests.storage,
-      creationTimestamp: pvc.metadata.creationTimestamp
-    }));
-  }
 
   async getIngresses(namespace = 'default') {
   await this.verifyClusterConnection();
@@ -354,23 +404,9 @@ class K8sService {
     hosts: ing.spec.rules?.map(r => r.host) || [],
     creationTimestamp: ing.metadata.creationTimestamp
   }));
-}
-
-  // PersistentVolumes
-  async getPersistentVolumes() {
-    await this.verifyClusterConnection();
-    const res = await this.coreV1Api.listPersistentVolume();
-    return res.body.items.map(pv => ({
-      name: pv.metadata.name,
-      capacity: pv.spec.capacity.storage,
-      accessModes: pv.spec.accessModes,
-      reclaimPolicy: pv.spec.persistentVolumeReclaimPolicy,
-      status: pv.status.phase,
-      creationTimestamp: pv.metadata.creationTimestamp
-    }));
   }
 }
-  
+ 
 // Singleton export
 // Initialize and export as singleton
 const k8sService = new K8sService();
