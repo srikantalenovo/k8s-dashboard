@@ -422,6 +422,7 @@ const ResourcesView = ({ currentUser }) => {
   };
 
   // Fixed fetchData function
+  // Updated fetchData function
   const fetchData = async () => {
     if (!hasPermission(currentUser, resourceType, 'read')) {
       setError('You do not have permission to view this resource');
@@ -436,9 +437,12 @@ const ResourcesView = ({ currentUser }) => {
       const config = resourceConfig[resourceType];
       let url = `/api/k8s/${config.apiPath}`;
       
-      // Add namespace query param if resource is namespaced
+      // For namespaced resources, include namespace in the request
       if (config.namespaced) {
-        url += `?namespace=${namespace}`;
+        // For GET requests with query params
+        const params = new URLSearchParams();
+        params.append('namespace', namespace);
+        url += `?${params.toString()}`;
       }
 
       const res = await api.get(url);
@@ -453,6 +457,7 @@ const ResourcesView = ({ currentUser }) => {
     }
   };
 
+
   useEffect(() => {
     fetchNamespaces();
   }, []);
@@ -460,7 +465,7 @@ const ResourcesView = ({ currentUser }) => {
   useEffect(() => {
     fetchData();
   }, [resourceType, namespace, currentUser]);
-  
+
   return (
     <Box sx={{ p: { xs: 1, sm: 2 } }}>
       <Grid container spacing={2} alignItems="center" sx={{ mb: 2 }}>
