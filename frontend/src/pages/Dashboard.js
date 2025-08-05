@@ -354,210 +354,113 @@ const AnalyzerView = () => (
 );
 // ResourcesView Starting
 
-const ResourcesView = () => {
-  const [tab, setTab] = useState('pods');
+const ResourcesView = ({ selectedNamespace }) => {
   const [resources, setResources] = useState([]);
-  const [namespaces, setNamespaces] = useState([]);
-  const [namespace, setNamespace] = useState('default');
+  const [resourceType, setResourceType] = useState('pods');
+  const [error, setError] = useState(null);
+
+  const resourceEndpoints = {
+    pods: '/api/k8s/pods',
+    deployments: '/api/k8s/deployments',
+    services: '/api/k8s/services',
+    replicasets: '/api/k8s/replicasets',
+    statefulsets: '/api/k8s/statefulsets',
+    daemonsets: '/api/k8s/daemonsets',
+    jobs: '/api/k8s/jobs',
+    cronjobs: '/api/k8s/cronjobs',
+    configmaps: '/api/k8s/configmaps',
+    secrets: '/api/k8s/secrets',
+    ingresses: '/api/k8s/ingresses',
+    persistentvolumeclaims: '/api/k8s/persistentvolumeclaims'
+  };
+
+  const formatValue = (value) => {
+    if (typeof value === 'object') {
+      return JSON.stringify(value, null, 2);
+    }
+    return value || '-';
+  };
+
+  const fetchResources = async () => {
+    try {
+      const url = `${resourceEndpoints[resourceType]}?namespace=${selectedNamespace}`;
+      const res = await fetch(url);
+      if (!res.ok) {
+        throw new Error(`Failed to fetch ${resourceType}`);
+      }
+      const data = await res.json();
+      setResources(data || []);
+      setError(null);
+    } catch (err) {
+      console.error(err);
+      setResources([]);
+      setError(err.message);
+    }
+  };
 
   useEffect(() => {
-    fetchNamespaces();
-  }, []);
-
-  useEffect(() => {
-    switch (tab) {
-      case 'pods':
-        fetchPods(namespace);
-        break;
-      case 'deployments':
-        fetchDeployments(namespace);
-        break;
-      case 'services':
-        fetchServices(namespace);
-        break;
-      case 'statefulsets':
-        fetchStatefulSets(namespace);
-        break;
-      case 'daemonsets':
-        fetchDaemonSets(namespace);
-        break;
-      case 'jobs':
-        fetchJobs(namespace);
-        break;
-      case 'cronjobs':
-        fetchCronJobs(namespace);
-        break;
-      case 'ingresses':
-        fetchIngresses(namespace);
-        break;
-      case 'configmaps':
-        fetchConfigMaps(namespace);
-        break;
-      case 'secrets':
-        fetchSecrets(namespace);
-        break;
-      default:
-        break;
+    if (selectedNamespace) {
+      fetchResources();
     }
-  }, [tab, namespace]);
+  }, [resourceType, selectedNamespace]);
 
-  const fetchNamespaces = async () => {
-    try {
-      const res = await axios.get('/api/k8s/namespaces');
-      setNamespaces(res.data);
-    } catch (err) {
-      console.error('Failed to fetch namespaces:', err);
-    }
-  };
+  const renderTable = () => {
+    if (resources.length === 0) return <Typography>No data found.</Typography>;
 
-  const fetchPods = async (ns) => {
-    try {
-      const res = await axios.get(`/api/k8s/pods?namespace=${ns}`);
-      setResources(res.data);
-    } catch (err) {
-      console.error('Failed to fetch pods:', err);
-    }
-  };
+    const headers = Object.keys(resources[0]);
 
-  const fetchDeployments = async (ns) => {
-    try {
-      const res = await axios.get(`/api/k8s/deployments?namespace=${ns}`);
-      setResources(res.data);
-    } catch (err) {
-      console.error('Failed to fetch deployments:', err);
-    }
-  };
-
-  const fetchServices = async (ns) => {
-    try {
-      const res = await axios.get(`/api/k8s/services?namespace=${ns}`);
-      setResources(res.data);
-    } catch (err) {
-      console.error('Failed to fetch services:', err);
-    }
-  };
-
-  const fetchStatefulSets = async (ns) => {
-    try {
-      const res = await axios.get(`/api/k8s/statefulsets?namespace=${ns}`);
-      setResources(res.data);
-    } catch (err) {
-      console.error('Failed to fetch statefulsets:', err);
-    }
-  };
-
-  const fetchDaemonSets = async (ns) => {
-    try {
-      const res = await axios.get(`/api/k8s/daemonsets?namespace=${ns}`);
-      setResources(res.data);
-    } catch (err) {
-      console.error('Failed to fetch daemonsets:', err);
-    }
-  };
-
-  const fetchJobs = async (ns) => {
-    try {
-      const res = await axios.get(`/api/k8s/jobs?namespace=${ns}`);
-      setResources(res.data);
-    } catch (err) {
-      console.error('Failed to fetch jobs:', err);
-    }
-  };
-
-  const fetchCronJobs = async (ns) => {
-    try {
-      const res = await axios.get(`/api/k8s/cronjobs?namespace=${ns}`);
-      setResources(res.data);
-    } catch (err) {
-      console.error('Failed to fetch cronjobs:', err);
-    }
-  };
-
-  const fetchIngresses = async (ns) => {
-    try {
-      const res = await axios.get(`/api/k8s/ingresses?namespace=${ns}`);
-      setResources(res.data);
-    } catch (err) {
-      console.error('Failed to fetch ingresses:', err);
-    }
-  };
-
-  const fetchConfigMaps = async (ns) => {
-    try {
-      const res = await axios.get(`/api/k8s/configmaps?namespace=${ns}`);
-      setResources(res.data);
-    } catch (err) {
-      console.error('Failed to fetch configmaps:', err);
-    }
-  };
-
-  const fetchSecrets = async (ns) => {
-    try {
-      const res = await axios.get(`/api/k8s/secrets?namespace=${ns}`);
-      setResources(res.data);
-    } catch (err) {
-      console.error('Failed to fetch secrets:', err);
-    }
-  };
-
-  return (
-    <Box>
-      <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
-        <Tabs value={tab} onChange={(e, newTab) => setTab(newTab)} textColor="primary" indicatorColor="primary">
-          <Tab label="Pods" value="pods" />
-          <Tab label="Deployments" value="deployments" />
-          <Tab label="Services" value="services" />
-          <Tab label="StatefulSets" value="statefulsets" />
-          <Tab label="DaemonSets" value="daemonsets" />
-          <Tab label="Jobs" value="jobs" />
-          <Tab label="CronJobs" value="cronjobs" />
-          <Tab label="Ingresses" value="ingresses" />
-          <Tab label="ConfigMaps" value="configmaps" />
-          <Tab label="Secrets" value="secrets" />
-        </Tabs>
-        <FormControl size="small" sx={{ minWidth: 180 }}>
-          <InputLabel>Namespace</InputLabel>
-          <Select value={namespace} onChange={(e) => setNamespace(e.target.value)} label="Namespace">
-            {namespaces.map(ns => (
-              <MenuItem key={ns} value={ns}>{ns}</MenuItem>
-            ))}
-          </Select>
-        </FormControl>
-      </Box>
-
-      <TableContainer component={Paper}>
+    return (
+      <TableContainer component={Paper} sx={{ marginTop: 2 }}>
         <Table size="small">
-          <TableHead>
+          <TableHead sx={{ backgroundColor: '#f0f0f0' }}>
             <TableRow>
-              <TableCell>Name</TableCell>
-              <TableCell>Status</TableCell>
-              <TableCell>Created At</TableCell>
-              <TableCell>Labels</TableCell>
+              {headers.map((header, index) => (
+                <TableCell key={index}><strong>{header}</strong></TableCell>
+              ))}
             </TableRow>
           </TableHead>
           <TableBody>
-            {resources.map((res) => (
-              <TableRow key={res.name}>
-                <TableCell>{res.name}</TableCell>
-                <TableCell>{res.status}</TableCell>
-                <TableCell>{res.creationTimestamp}</TableCell>
-                <TableCell>
-                  {res.labels && Object.entries(res.labels).map(([key, val]) => (
-                    <span key={key} style={{ marginRight: 4, fontSize: '0.75rem', color: '#555' }}>
-                      {key}: {val}
-                    </span>
-                  ))}
-                </TableCell>
+            {resources.map((item, rowIndex) => (
+              <TableRow key={rowIndex}>
+                {headers.map((header, cellIndex) => (
+                  <TableCell key={cellIndex}>
+                    <pre style={{ margin: 0 }}>{formatValue(item[header])}</pre>
+                  </TableCell>
+                ))}
               </TableRow>
             ))}
           </TableBody>
         </Table>
       </TableContainer>
+    );
+  };
+
+  return (
+    <Box sx={{ marginTop: 3 }}>
+      <Typography variant="h6">Kubernetes Resources</Typography>
+      <FormControl sx={{ minWidth: 200, marginTop: 2 }}>
+        <InputLabel>Resource Type</InputLabel>
+        <Select
+          value={resourceType}
+          onChange={(e) => setResourceType(e.target.value)}
+          label="Resource Type"
+        >
+          {Object.keys(resourceEndpoints).map((type) => (
+            <MenuItem key={type} value={type}>
+              {type.charAt(0).toUpperCase() + type.slice(1)}
+            </MenuItem>
+          ))}
+        </Select>
+      </FormControl>
+
+      {error ? (
+        <Alert severity="error" sx={{ marginTop: 2 }}>{error}</Alert>
+      ) : (
+        renderTable()
+      )}
     </Box>
   );
 };
-
-
 
 
 // ResourcesView ending
