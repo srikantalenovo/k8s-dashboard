@@ -355,105 +355,207 @@ const AnalyzerView = () => (
 );
 // ResourcesView Starting
 
-const ResourcesView = ({ selectedResource, selectedNamespace }) => {
+const ResourcesView = ({ currentUser }) => {
+  const [resourceType, setResourceType] = useState('nodes');
+  const [namespace, setNamespace] = useState('default');
+  const [namespaces, setNamespaces] = useState([]);
   const [data, setData] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
 
-  const apiMap = {
-    pods: '/api/k8s/pods',
-    services: '/api/k8s/services',
-    deployments: '/api/k8s/deployments',
-    jobs: '/api/k8s/jobs',
-    ingresses: '/api/k8s/ingresses',
-    statefulsets: '/api/k8s/statefulsets',
-    daemonsets: '/api/k8s/daemonsets',
-    cronjobs: '/api/k8s/cronjobs',
-    replicasets: '/api/k8s/replicasets',
-    configmaps: '/api/k8s/configmaps',
-    secrets: '/api/k8s/secrets',
-    persistentvolumes: '/api/k8s/persistentvolumes',
-    persistentvolumeclaims: '/api/k8s/persistentvolumeclaims',
-    networkpolicies: '/api/k8s/networkpolicies',
-    nodes: '/api/k8s/nodes',
+  // Updated resource config with proper API mappings
+  const resourceConfig = {
+    nodes: { 
+      label: 'Nodes', 
+      namespaced: false,
+      apiPath: 'nodes' 
+    },
+    namespaces: { 
+      label: 'Namespaces', 
+      namespaced: false,
+      apiPath: 'namespaces' 
+    },
+    pods: { 
+      label: 'Pods', 
+      namespaced: true,
+      apiPath: 'pods' 
+    },
+    deployments: { 
+      label: 'Deployments', 
+      namespaced: true,
+      apiPath: 'deployments' 
+    },
+    statefulsets: { 
+      label: 'StatefulSets', 
+      namespaced: true,
+      apiPath: 'statefulsets' 
+    },
+    daemonsets: { 
+      label: 'DaemonSets', 
+      namespaced: true,
+      apiPath: 'daemonsets' 
+    },
+    services: { 
+      label: 'Services', 
+      namespaced: true,
+      apiPath: 'services' 
+    },
+    configmaps: { 
+      label: 'ConfigMaps', 
+      namespaced: true,
+      apiPath: 'configmaps' 
+    },
+    secrets: { 
+      label: 'Secrets', 
+      namespaced: true,
+      apiPath: 'secrets' 
+    }
   };
 
-  useEffect(() => {
-    if (!selectedResource) return;
-    setLoading(true);
+  const fetchNamespaces = async () => {
+    try {
+      const res = await api.get('/api/k8s/namespaces');
+      setNamespaces((res.data || []).map(ns => ns.name || ns));
+    } catch (err) {
+      console.error('Error fetching namespaces:', err);
+    }
+  };
 
-    let url = apiMap[selectedResource];
-    if (!url) {
+  // Fixed fetchData function
+  const fetchData = async () => {
+    if (!hasPermission(currentUser, resourceType, 'read')) {
+      setError('You do not have permission to view this resource');
       setData([]);
-      setLoading(false);
       return;
     }
 
-    // Append namespace if required
-    const namespacedResources = [
-      'pods', 'services', 'deployments', 'jobs', 'cronjobs',
-      'ingresses', 'configmaps', 'secrets', 'persistentvolumeclaims',
-      'statefulsets', 'daemonsets', 'replicasets', 'networkpolicies',
-    ];
+    setLoading(true);
+    setError(null);
+    
+    try {
+      const config = resourceConfig[resourceType];
+      let url = `/api/k8s/${config.apiPath}`;
+      
+      // Add namespace query param if resource is namespaced
+      if (config.namespaced) {
+        url += `?namespace=${namespace}`;
+      }
 
-    if (namespacedResources.includes(selectedResource)) {
-      url += `?namespace=${selectedNamespace}`;
+      const res = await api.get(url);
+      const formatted = Array.isArray(res.data) ? res.data : [res.data];
+      setData(formatted);
+      
+    } catch (err) {
+      console.error(`Error fetching ${resourceType}:`, err);
+      setError(err.response?.data?.message || `Failed to fetch ${resourceType}`);
+    } finally {
+      setLoading(false);
     }
-
-    fetch(url)
-      .then(res => res.json())
-      .then(data => {
-        setData(data.items || data); // Support both array and items object
-        setLoading(false);
-      })
-      .catch(err => {
-        console.error('Error fetching:', err);
-        setData([]);
-        setLoading(false);
-      });
-  }, [selectedResource, selectedNamespace]);
-
-  const renderTable = () => {
-    if (!data.length) return <p>No {selectedResource} found.</p>;
-
-    // Try to detect some common metadata to render dynamic table
-    const sample = data[0];
-    const headers = Object.keys(sample.metadata || {});
-
-    return (
-      <table style={{ width: '100%', borderCollapse: 'collapse', marginTop: '1rem' }}>
-        <thead>
-          <tr>
-            {headers.map((header, i) => (
-              <th key={i} style={{ border: '1px solid #ddd', padding: '8px', textTransform: 'capitalize' }}>
-                {header}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {data.map((res, idx) => (
-            <tr key={idx}>
-              {headers.map((header, i) => (
-                <td key={i} style={{ border: '1px solid #eee', padding: '6px' }}>
-                  {res.metadata?.[header] || '-'}
-                </td>
-              ))}
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    );
   };
 
+  useEffect(() => {
+    fetchNamespaces();
+  }, []);
+
+  useEffect(() => {
+    fetchData();
+  }, [resourceType, namespace, currentUser]);
+  
   return (
-    <div style={{ padding: '1rem', background: '#f9f9f9', borderRadius: '12px', boxShadow: '0 1px 5px rgba(0,0,0,0.1)' }}>
-      <h3 style={{ marginBottom: '1rem', fontWeight: 'bold', textTransform: 'capitalize' }}>
-        {selectedResource} in <code>{selectedNamespace}</code> namespace
-      </h3>
-      {loading ? <p>Loading {selectedResource}...</p> : renderTable()}
-    </div>
+    <Box sx={{ p: { xs: 1, sm: 2 } }}>
+      <Grid container spacing={2} alignItems="center" sx={{ mb: 2 }}>
+        {/* Resource Selector */}
+        <Grid item xs={12} md={4}>
+          <MotionPaper>
+            <Select
+              fullWidth
+              value={resourceType}
+              onChange={(e) => setResourceType(e.target.value)}
+              sx={{ color: 'white', '& .MuiSelect-icon': { color: 'white' } }}
+            >
+              {Object.entries(resourceConfig)
+                .filter(([key]) => hasPermission(currentUser, key, 'read'))
+                .map(([key, { label }]) => (
+                  <MenuItem key={key} value={key} sx={{ color: '#333' }}>
+                    {label}
+                  </MenuItem>
+                ))}
+            </Select>
+          </MotionPaper>
+        </Grid>
+
+        {/* Namespace Selector (only for namespaced resources) */}
+        {resourceConfig[resourceType]?.namespaced && (
+          <Grid item xs={12} md={4}>
+            <MotionPaper>
+              <Select
+                fullWidth
+                value={namespace}
+                onChange={(e) => setNamespace(e.target.value)}
+                sx={{ color: 'white', '& .MuiSelect-icon': { color: 'white' } }}
+              >
+                {namespaces.map((ns) => (
+                  <MenuItem key={ns} value={ns}>{ns}</MenuItem>
+                ))}
+              </Select>
+            </MotionPaper>
+          </Grid>
+        )}
+
+        {/* Refresh Button */}
+        <Grid item>
+          <IconButton
+            onClick={fetchData}
+            sx={{
+              color: 'white',
+              backgroundColor: 'rgba(255, 255, 255, 0.1)',
+              '&:hover': { backgroundColor: 'rgba(255, 255, 255, 0.2)' }
+            }}
+          >
+            <RefreshIcon />
+          </IconButton>
+        </Grid>
+      </Grid>
+
+      {/* Loading / Error */}
+      {loading && <LinearProgress sx={{ height: 2, borderRadius: 5, mb: 2 }} />}
+      {error && (
+        <MotionPaper sx={{ p: 2, mb: 2 }}>
+          <Typography color="error">{error}</Typography>
+        </MotionPaper>
+      )}
+
+      {/* Data Table */}
+      <MotionPaper>
+        <TableContainer>
+          <Table>
+            <TableHead>
+              <TableRow sx={{ backgroundColor: 'rgba(255, 255, 255, 0.1)' }}>
+                {data[0] &&
+                  Object.keys(data[0]).map((key) => (
+                    <TableCell key={key} sx={{ color: '#fff', fontWeight: 'bold' }}>
+                      {key.toUpperCase()}
+                    </TableCell>
+                  ))}
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {data.map((item, index) => (
+                <TableRow key={index} sx={{ '&:hover': { backgroundColor: 'rgba(255, 255, 255, 0.03)' } }}>
+                  {Object.values(item).map((value, idx) => (
+                    <TableCell key={idx} sx={{ color: 'rgba(255, 255, 255, 0.8)' }}>
+                      {typeof value === 'object' ? JSON.stringify(value) : String(value)}
+                    </TableCell>
+                  ))}
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </TableContainer>
+      </MotionPaper>
+    </Box>
   );
-};
+};  
 
 
 // ResourcesView ending
