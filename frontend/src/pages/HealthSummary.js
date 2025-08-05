@@ -1,4 +1,3 @@
-// In AnalyzerView.js - Replace with this complete version
 import React, { useState, useEffect } from 'react';
 import {
   Box, Typography, Table, TableBody, TableCell, TableContainer,
@@ -31,7 +30,7 @@ const MotionPaper = ({ children }) => (
   </motion.div>
 );
 
-const AnalyzerView = () => {
+const HealthSummary = () => {
   const [summary, setSummary] = useState({
     crashLoopPods: [],
     failedJobs: [],
@@ -64,63 +63,15 @@ const AnalyzerView = () => {
     };
 
     fetchHealthData();
-    const interval = setInterval(fetchHealthData, 30000);
+    const interval = setInterval(fetchHealthData, 30000); // Refresh every 30s
     return () => clearInterval(interval);
   }, []);
-
-  const SummaryCard = ({ title, count, icon, color }) => (
-    <Paper sx={{ 
-      p: 2,
-      backgroundColor: theme => theme.palette[color].dark,
-      color: 'white',
-      borderRadius: '12px'
-    }}>
-      <Box sx={{ display: 'flex', alignItems: 'center' }}>
-        {React.cloneElement(icon, { sx: { fontSize: 40, mr: 2 } })}
-        <Box>
-          <Typography variant="subtitle2">{title}</Typography>
-          <Typography variant="h4">{count}</Typography>
-        </Box>
-      </Box>
-    </Paper>
-  );
-
-  const ResourceTable = ({ resources, columns }) => (
-    <TableContainer>
-      <Table>
-        <TableHead sx={{ backgroundColor: 'rgba(255,255,255,0.1)' }}>
-          <TableRow>
-            {columns.map(col => (
-              <TableCell key={col.id} sx={{ color: 'white' }}>
-                {col.label}
-              </TableCell>
-            ))}
-          </TableRow>
-        </TableHead>
-        <TableBody>
-          {resources.map(resource => (
-            <TableRow key={resource.name}>
-              {columns.map(col => (
-                <TableCell key={`${resource.name}-${col.id}`}>
-                  {col.format ? col.format(resource[col.id]) : resource[col.id]}
-                </TableCell>
-              ))}
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
-    </TableContainer>
-  );
 
   if (summary.loading) return <LinearProgress sx={{ height: 2, borderRadius: 5 }} />;
   if (summary.error) return <Typography color="error">Error: {summary.error}</Typography>;
 
   return (
     <Box sx={{ p: 2 }}>
-      <Typography variant="h4" gutterBottom sx={{ color: 'white' }}>
-        Cluster Health Analyzer
-      </Typography>
-      
       {/* Summary Cards */}
       <Grid container spacing={2} sx={{ mb: 3 }}>
         <Grid item xs={12} sm={6} md={3}>
@@ -157,7 +108,7 @@ const AnalyzerView = () => {
         </Grid>
       </Grid>
 
-      {/* CrashLoop Pods Table */}
+      {/* Detailed Tables */}
       <MotionPaper>
         <Typography variant="h6" sx={{ p: 2, color: 'white' }}>
           <ErrorIcon sx={{ verticalAlign: 'middle', mr: 1 }} />
@@ -168,15 +119,15 @@ const AnalyzerView = () => {
           columns={[
             { id: 'name', label: 'Pod Name' },
             { id: 'namespace', label: 'Namespace' },
-            { id: 'status', label: 'Status', format: () => (
-              <Chip label="CrashLoopBackOff" color="error" icon={<ErrorIcon />} size="small" />
+            { id: 'status', label: 'Status', format: value => (
+              <Chip label={value} color="error" icon={<ErrorIcon />} size="small" />
             )},
             { id: 'restarts', label: 'Restarts' }
           ]}
         />
       </MotionPaper>
 
-      {/* Unhealthy Deployments Table */}
+      {/* Repeat similar blocks for Jobs/Nodes/Deployments */}
       <MotionPaper>
         <Typography variant="h6" sx={{ p: 2, color: 'white' }}>
           <WarningIcon sx={{ verticalAlign: 'middle', mr: 1 }} />
@@ -193,6 +144,11 @@ const AnalyzerView = () => {
                 color={value.ready === value.replicas ? 'success' : 'error'}
                 icon={value.ready === value.replicas ? <HealthyIcon /> : <ErrorIcon />}
               />
+            )},
+            { id: 'conditions', label: 'Issues', format: conditions => (
+              conditions.map(c => (
+                <Chip label={c} color="warning" size="small" sx={{ mr: 1 }} />
+              ))
             )}
           ]}
         />
@@ -201,4 +157,49 @@ const AnalyzerView = () => {
   );
 };
 
-export default AnalyzerView;
+// Reusable Components
+const SummaryCard = ({ title, count, icon, color }) => (
+  <Paper sx={{ 
+    p: 2,
+    backgroundColor: theme => theme.palette[color].dark,
+    color: 'white',
+    borderRadius: '12px'
+  }}>
+    <Box sx={{ display: 'flex', alignItems: 'center' }}>
+      {React.cloneElement(icon, { sx: { fontSize: 40, mr: 2 } })}
+      <Box>
+        <Typography variant="subtitle2">{title}</Typography>
+        <Typography variant="h4">{count}</Typography>
+      </Box>
+    </Box>
+  </Paper>
+);
+
+const ResourceTable = ({ resources, columns }) => (
+  <TableContainer>
+    <Table>
+      <TableHead sx={{ backgroundColor: 'rgba(255,255,255,0.1)' }}>
+        <TableRow>
+          {columns.map(col => (
+            <TableCell key={col.id} sx={{ color: 'white' }}>
+              {col.label}
+            </TableCell>
+          ))}
+        </TableRow>
+      </TableHead>
+      <TableBody>
+        {resources.map(resource => (
+          <TableRow key={resource.name}>
+            {columns.map(col => (
+              <TableCell key={`${resource.name}-${col.id}`}>
+                {col.format ? col.format(resource[col.id]) : resource[col.id]}
+              </TableCell>
+            ))}
+          </TableRow>
+        ))}
+      </TableBody>
+    </Table>
+  </TableContainer>
+);
+
+export default HealthSummary;
