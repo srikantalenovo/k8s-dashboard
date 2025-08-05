@@ -30,7 +30,7 @@ import {
   Visibility as VisibilityIcon
 } from '@mui/icons-material';
 import { motion } from 'framer-motion';
-
+import HealthSummary from './HealthSummary';
 
 // Permission presets
 const PERMISSION_OPTIONS = [
@@ -346,13 +346,18 @@ const HomeView = () => (
   </Box>
 );
 
-const AnalyzerView = () => (
-  <Box>
-    <Typography variant="h4" gutterBottom sx={{ color: 'white' }}>
-      Cluster Analyzer
-    </Typography>
-  </Box>
-);
+
+
+const AnalyzerView = () => {
+  return (
+    <Box>
+      <Typography variant="h4" gutterBottom sx={{ color: 'white' }}>
+        Cluster Health Analyzer
+      </Typography>
+      <HealthSummary />
+    </Box>
+  );
+};
 // ResourcesView Starting
 
 const ResourcesView = ({ currentUser }) => {

@@ -404,6 +404,48 @@ class K8sService {
     creationTimestamp: ing.metadata.creationTimestamp
   }));
   }
+ //Analyzer backend code 
+// Add filtered query methods
+async getPods(namespace = 'default', filter) {
+  const pods = await this.listNamespacedPod(namespace);
+  return pods.body.items.filter(pod => {
+    if (filter?.status === 'CrashLoopBackOff') {
+      return pod.status.containerStatuses?.some(cs => 
+        cs.state.waiting?.reason === 'CrashLoopBackOff'
+      );
+    }
+    return true;
+  }).map(p => ({
+    name: p.metadata.name,
+    namespace: p.metadata.namespace,
+    status: 'CrashLoopBackOff',
+    restarts: p.status.containerStatuses?.reduce((acc, cs) => acc + cs.restartCount, 0)
+  }));
+}
+
+async getDeployments(namespace = 'default', filter) {
+  const deployments = await this.appsV1Api.listNamespacedDeployment(namespace);
+  return deployments.body.items.filter(dep => {
+    if (filter?.status === 'unhealthy') {
+      return dep.status.unavailableReplicas > 0 || 
+             dep.status.availableReplicas !== dep.status.replicas;
+    }
+    return true;
+  }).map(d => ({
+    name: d.metadata.name,
+    namespace: d.metadata.namespace,
+    available: {
+      ready: d.status.availableReplicas || 0,
+      replicas: d.status.replicas || 0
+    },
+    conditions: d.status.conditions
+      ?.filter(c => c.status !== 'True')
+      ?.map(c => c.reason) || []
+  }));
+}
+
+//Analyzer backend code End
+
 }
  
 // Singleton export
