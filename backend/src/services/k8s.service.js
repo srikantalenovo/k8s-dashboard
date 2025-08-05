@@ -1,4 +1,4 @@
-import { KubeConfig, CoreV1Api, AppsV1Api, NetworkingV1Api, BatchV1beta1Api, BatchV1Api } from '@kubernetes/client-node';
+import { KubeConfig, CoreV1Api, AppsV1Api, NetworkingV1Api, BatchV1Api } from '@kubernetes/client-node';
 import logger from '../utils/logger.js';
 import fs from 'fs/promises'; // Using fs promises API for async file operations
 
@@ -55,7 +55,6 @@ class K8sService {
     this.coreV1Api = this.kc.makeApiClient(CoreV1Api);
     this.appsV1Api = this.kc.makeApiClient(AppsV1Api);
     this.batchV1Api = this.kc.makeApiClient(BatchV1Api);
-    this.batchV1beta1Api = this.kc.makeApiClient(BatchV1beta1Api);
     this.networkingV1Api = this.kc.makeApiClient(NetworkingV1Api);
       
     // Add timeout configuration safely
@@ -384,7 +383,7 @@ class K8sService {
   // CronJobs
   async getCronJobs(namespace = 'default') {
     await this.verifyClusterConnection();
-    const res = await this.batchV1beta1Api.listNamespacedCronJob(namespace);
+    const res = await this.batchV1Api.listNamespacedCronJob(namespace);
     return res.body.items.map(cj => ({
       name: cj.metadata.name,
       namespace: cj.metadata.namespace,
