@@ -354,170 +354,209 @@ const AnalyzerView = () => (
 );
 // ResourcesView Starting
 
-const ResourcesView = ({ currentUser }) => {
-  const [resourceType, setResourceType] = useState('nodes');
-  const [namespace, setNamespace] = useState('default');
+const ResourcesView = () => {
+  const [tab, setTab] = useState('pods');
+  const [resources, setResources] = useState([]);
   const [namespaces, setNamespaces] = useState([]);
-  const [data, setData] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
-
-  // Resources list & config
-  const resourceConfig = {
-    nodes: { label: 'Nodes', namespaced: false },
-    namespaces: { label: 'Namespaces', namespaced: false },
-    pods: { label: 'Pods', namespaced: true },
-    deployments: { label: 'Deployments', namespaced: true },
-    services: { label: 'Services', namespaced: true },
-    configmaps: { label: 'ConfigMaps', namespaced: true },
-    secrets: { label: 'Secrets', namespaced: true },
-    statefulsets: { label: 'StatefulSets', namespaced: true },
-    daemonsets: { label: 'DaemonSets', namespaced: true },
-    jobs: { label: 'Jobs', namespaced: true },
-    cronjobs: { label: 'CronJobs', namespaced: true },
-    persistentvolumeclaims: { label: 'PVCs', namespaced: true },
-    persistentvolumes: { label: 'PVs', namespaced: false }
-  };
-
-  // Fetch namespaces from backend
-  const fetchNamespaces = async () => {
-    try {
-      const res = await api.get('/api/k8s/namespaces');
-      setNamespaces((res.data || []).map(ns => (typeof ns === 'string' ? ns : ns.name)));
-    } catch (err) {
-      console.error('Error fetching namespaces:', err);
-    }
-  };
-
-  // Fetch data based on resourceType
-  const fetchData = async () => {
-    if (!hasPermission(currentUser, resourceType, 'read')) {
-      setError('You do not have permission to view this resource');
-      setData([]);
-      return;
-    }
-
-    setLoading(true);
-    setError(null);
-    try {
-      let url = `/api/k8s/${resourceType}`;
-      if (resourceConfig[resourceType]?.namespaced) {
-        url += `?namespace=${namespace}`;
-      }
-      const res = await api.get(url);
-      const formatted = Array.isArray(res.data) ? res.data : [res.data];
-      setData(formatted);
-    } catch (err) {
-      console.error(`Error fetching ${resourceType}:`, err);
-      setError(err.message || `Failed to fetch ${resourceType}`);
-    } finally {
-      setLoading(false);
-    }
-  };
+  const [namespace, setNamespace] = useState('default');
 
   useEffect(() => {
     fetchNamespaces();
   }, []);
 
   useEffect(() => {
-    fetchData();
-  }, [resourceType, namespace, currentUser]);
+    switch (tab) {
+      case 'pods':
+        fetchPods(namespace);
+        break;
+      case 'deployments':
+        fetchDeployments(namespace);
+        break;
+      case 'services':
+        fetchServices(namespace);
+        break;
+      case 'statefulsets':
+        fetchStatefulSets(namespace);
+        break;
+      case 'daemonsets':
+        fetchDaemonSets(namespace);
+        break;
+      case 'jobs':
+        fetchJobs(namespace);
+        break;
+      case 'cronjobs':
+        fetchCronJobs(namespace);
+        break;
+      case 'ingresses':
+        fetchIngresses(namespace);
+        break;
+      case 'configmaps':
+        fetchConfigMaps(namespace);
+        break;
+      case 'secrets':
+        fetchSecrets(namespace);
+        break;
+      default:
+        break;
+    }
+  }, [tab, namespace]);
+
+  const fetchNamespaces = async () => {
+    try {
+      const res = await axios.get('/api/k8s/namespaces');
+      setNamespaces(res.data);
+    } catch (err) {
+      console.error('Failed to fetch namespaces:', err);
+    }
+  };
+
+  const fetchPods = async (ns) => {
+    try {
+      const res = await axios.get(`/api/k8s/pods?namespace=${ns}`);
+      setResources(res.data);
+    } catch (err) {
+      console.error('Failed to fetch pods:', err);
+    }
+  };
+
+  const fetchDeployments = async (ns) => {
+    try {
+      const res = await axios.get(`/api/k8s/deployments?namespace=${ns}`);
+      setResources(res.data);
+    } catch (err) {
+      console.error('Failed to fetch deployments:', err);
+    }
+  };
+
+  const fetchServices = async (ns) => {
+    try {
+      const res = await axios.get(`/api/k8s/services?namespace=${ns}`);
+      setResources(res.data);
+    } catch (err) {
+      console.error('Failed to fetch services:', err);
+    }
+  };
+
+  const fetchStatefulSets = async (ns) => {
+    try {
+      const res = await axios.get(`/api/k8s/statefulsets?namespace=${ns}`);
+      setResources(res.data);
+    } catch (err) {
+      console.error('Failed to fetch statefulsets:', err);
+    }
+  };
+
+  const fetchDaemonSets = async (ns) => {
+    try {
+      const res = await axios.get(`/api/k8s/daemonsets?namespace=${ns}`);
+      setResources(res.data);
+    } catch (err) {
+      console.error('Failed to fetch daemonsets:', err);
+    }
+  };
+
+  const fetchJobs = async (ns) => {
+    try {
+      const res = await axios.get(`/api/k8s/jobs?namespace=${ns}`);
+      setResources(res.data);
+    } catch (err) {
+      console.error('Failed to fetch jobs:', err);
+    }
+  };
+
+  const fetchCronJobs = async (ns) => {
+    try {
+      const res = await axios.get(`/api/k8s/cronjobs?namespace=${ns}`);
+      setResources(res.data);
+    } catch (err) {
+      console.error('Failed to fetch cronjobs:', err);
+    }
+  };
+
+  const fetchIngresses = async (ns) => {
+    try {
+      const res = await axios.get(`/api/k8s/ingresses?namespace=${ns}`);
+      setResources(res.data);
+    } catch (err) {
+      console.error('Failed to fetch ingresses:', err);
+    }
+  };
+
+  const fetchConfigMaps = async (ns) => {
+    try {
+      const res = await axios.get(`/api/k8s/configmaps?namespace=${ns}`);
+      setResources(res.data);
+    } catch (err) {
+      console.error('Failed to fetch configmaps:', err);
+    }
+  };
+
+  const fetchSecrets = async (ns) => {
+    try {
+      const res = await axios.get(`/api/k8s/secrets?namespace=${ns}`);
+      setResources(res.data);
+    } catch (err) {
+      console.error('Failed to fetch secrets:', err);
+    }
+  };
 
   return (
-    <Box sx={{ p: { xs: 1, sm: 2 } }}>
-      <Grid container spacing={2} alignItems="center" sx={{ mb: 2 }}>
-        {/* Resource Selector */}
-        <Grid item xs={12} md={4}>
-          <MotionPaper>
-            <Select
-              fullWidth
-              value={resourceType}
-              onChange={(e) => setResourceType(e.target.value)}
-              sx={{ color: 'white', '& .MuiSelect-icon': { color: 'white' } }}
-            >
-              {Object.entries(resourceConfig)
-                .filter(([key]) => hasPermission(currentUser, key, 'read'))
-                .map(([key, { label }]) => (
-                  <MenuItem key={key} value={key} sx={{ color: '#333' }}>
-                    {label}
-                  </MenuItem>
-                ))}
-            </Select>
-          </MotionPaper>
-        </Grid>
+    <Box>
+      <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
+        <Tabs value={tab} onChange={(e, newTab) => setTab(newTab)} textColor="primary" indicatorColor="primary">
+          <Tab label="Pods" value="pods" />
+          <Tab label="Deployments" value="deployments" />
+          <Tab label="Services" value="services" />
+          <Tab label="StatefulSets" value="statefulsets" />
+          <Tab label="DaemonSets" value="daemonsets" />
+          <Tab label="Jobs" value="jobs" />
+          <Tab label="CronJobs" value="cronjobs" />
+          <Tab label="Ingresses" value="ingresses" />
+          <Tab label="ConfigMaps" value="configmaps" />
+          <Tab label="Secrets" value="secrets" />
+        </Tabs>
+        <FormControl size="small" sx={{ minWidth: 180 }}>
+          <InputLabel>Namespace</InputLabel>
+          <Select value={namespace} onChange={(e) => setNamespace(e.target.value)} label="Namespace">
+            {namespaces.map(ns => (
+              <MenuItem key={ns} value={ns}>{ns}</MenuItem>
+            ))}
+          </Select>
+        </FormControl>
+      </Box>
 
-        {/* Namespace Selector (only for namespaced resources) */}
-        {resourceConfig[resourceType]?.namespaced && (
-          <Grid item xs={12} md={4}>
-            <MotionPaper>
-              <Select
-                fullWidth
-                value={namespace}
-                onChange={(e) => setNamespace(e.target.value)}
-                sx={{ color: 'white', '& .MuiSelect-icon': { color: 'white' } }}
-              >
-                {namespaces.map((ns) => (
-                  <MenuItem key={ns} value={ns}>{ns}</MenuItem>
-                ))}
-              </Select>
-            </MotionPaper>
-          </Grid>
-        )}
-
-        {/* Refresh Button */}
-        <Grid item>
-          <IconButton
-            onClick={fetchData}
-            sx={{
-              color: 'white',
-              backgroundColor: 'rgba(255, 255, 255, 0.1)',
-              '&:hover': { backgroundColor: 'rgba(255, 255, 255, 0.2)' }
-            }}
-          >
-            <RefreshIcon />
-          </IconButton>
-        </Grid>
-      </Grid>
-
-      {/* Loading / Error */}
-      {loading && <LinearProgress sx={{ height: 2, borderRadius: 5, mb: 2 }} />}
-      {error && (
-        <MotionPaper sx={{ p: 2, mb: 2 }}>
-          <Typography color="error">{error}</Typography>
-        </MotionPaper>
-      )}
-
-      {/* Data Table */}
-      <MotionPaper>
-        <TableContainer>
-          <Table>
-            <TableHead>
-              <TableRow sx={{ backgroundColor: 'rgba(255, 255, 255, 0.1)' }}>
-                {data[0] &&
-                  Object.keys(data[0]).map((key) => (
-                    <TableCell key={key} sx={{ color: '#fff', fontWeight: 'bold' }}>
-                      {key.toUpperCase()}
-                    </TableCell>
+      <TableContainer component={Paper}>
+        <Table size="small">
+          <TableHead>
+            <TableRow>
+              <TableCell>Name</TableCell>
+              <TableCell>Status</TableCell>
+              <TableCell>Created At</TableCell>
+              <TableCell>Labels</TableCell>
+            </TableRow>
+          </TableHead>
+          <TableBody>
+            {resources.map((res) => (
+              <TableRow key={res.name}>
+                <TableCell>{res.name}</TableCell>
+                <TableCell>{res.status}</TableCell>
+                <TableCell>{res.creationTimestamp}</TableCell>
+                <TableCell>
+                  {res.labels && Object.entries(res.labels).map(([key, val]) => (
+                    <span key={key} style={{ marginRight: 4, fontSize: '0.75rem', color: '#555' }}>
+                      {key}: {val}
+                    </span>
                   ))}
+                </TableCell>
               </TableRow>
-            </TableHead>
-            <TableBody>
-              {data.map((item, index) => (
-                <TableRow key={index} sx={{ '&:hover': { backgroundColor: 'rgba(255, 255, 255, 0.03)' } }}>
-                  {Object.values(item).map((value, idx) => (
-                    <TableCell key={idx} sx={{ color: 'rgba(255, 255, 255, 0.8)' }}>
-                      {typeof value === 'object' ? JSON.stringify(value) : String(value)}
-                    </TableCell>
-                  ))}
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </TableContainer>
-      </MotionPaper>
+            ))}
+          </TableBody>
+        </Table>
+      </TableContainer>
     </Box>
   );
 };
+
 
 
 
