@@ -31,6 +31,9 @@ import {
 } from '@mui/icons-material';
 import { motion } from 'framer-motion';
 
+import ResourcesView from './ResourcesView'; // or wherever you place the file
+
+
 // Permission presets
 const PERMISSION_OPTIONS = [
   { resource: 'pods', actions: ['read', 'delete'] },
@@ -354,114 +357,10 @@ const AnalyzerView = () => (
 );
 // ResourcesView Starting
 
-const ResourcesView = ({ selectedNamespace }) => {
-  const [resources, setResources] = useState([]);
-  const [resourceType, setResourceType] = useState('pods');
-  const [error, setError] = useState(null);
-
-  const resourceEndpoints = {
-    pods: '/api/k8s/pods',
-    deployments: '/api/k8s/deployments',
-    services: '/api/k8s/services',
-    replicasets: '/api/k8s/replicasets',
-    statefulsets: '/api/k8s/statefulsets',
-    daemonsets: '/api/k8s/daemonsets',
-    jobs: '/api/k8s/jobs',
-    cronjobs: '/api/k8s/cronjobs',
-    configmaps: '/api/k8s/configmaps',
-    secrets: '/api/k8s/secrets',
-    ingresses: '/api/k8s/ingresses',
-    persistentvolumeclaims: '/api/k8s/persistentvolumeclaims'
-  };
-
-  const formatValue = (value) => {
-    if (typeof value === 'object') {
-      return JSON.stringify(value, null, 2);
-    }
-    return value || '-';
-  };
-
-  const fetchResources = async () => {
-    try {
-      const url = `${resourceEndpoints[resourceType]}?namespace=${selectedNamespace}`;
-      const res = await fetch(url);
-      if (!res.ok) {
-        throw new Error(`Failed to fetch ${resourceType}`);
-      }
-      const data = await res.json();
-      setResources(data || []);
-      setError(null);
-    } catch (err) {
-      console.error(err);
-      setResources([]);
-      setError(err.message);
-    }
-  };
-
-  useEffect(() => {
-    if (selectedNamespace) {
-      fetchResources();
-    }
-  }, [resourceType, selectedNamespace]);
-
-  const renderTable = () => {
-    if (resources.length === 0) return <Typography>No data found.</Typography>;
-
-    const headers = Object.keys(resources[0]);
-
-    return (
-      <TableContainer component={Paper} sx={{ marginTop: 2 }}>
-        <Table size="small">
-          <TableHead sx={{ backgroundColor: '#f0f0f0' }}>
-            <TableRow>
-              {headers.map((header, index) => (
-                <TableCell key={index}><strong>{header}</strong></TableCell>
-              ))}
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {resources.map((item, rowIndex) => (
-              <TableRow key={rowIndex}>
-                {headers.map((header, cellIndex) => (
-                  <TableCell key={cellIndex}>
-                    <pre style={{ margin: 0 }}>{formatValue(item[header])}</pre>
-                  </TableCell>
-                ))}
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </TableContainer>
-    );
-  };
-
-  return (
-    <Box sx={{ marginTop: 3 }}>
-      <Typography variant="h6">Kubernetes Resources</Typography>
-      <FormControl sx={{ minWidth: 200, marginTop: 2 }}>
-        <InputLabel>Resource Type</InputLabel>
-        <Select
-          value={resourceType}
-          onChange={(e) => setResourceType(e.target.value)}
-          label="Resource Type"
-        >
-          {Object.keys(resourceEndpoints).map((type) => (
-            <MenuItem key={type} value={type}>
-              {type.charAt(0).toUpperCase() + type.slice(1)}
-            </MenuItem>
-          ))}
-        </Select>
-      </FormControl>
-
-      {error ? (
-        <Alert severity="error" sx={{ marginTop: 2 }}>{error}</Alert>
-      ) : (
-        renderTable()
-      )}
-    </Box>
-  );
-};
-
+<ResourcesView
+  selectedResource={selectedResource}
+  selectedNamespace={selectedNamespace}
+/>
 
 // ResourcesView ending
 const LogsView = () => (
