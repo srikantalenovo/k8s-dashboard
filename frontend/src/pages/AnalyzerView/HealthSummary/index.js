@@ -1,30 +1,42 @@
+// src/pages/AnalyzerView/HealthSummary/index.js
 import React, { useEffect, useState } from "react";
+import { fetchHealthSummary } from "../../../services/api";
 import SummaryCard from "./SummaryCard";
 import ResourceTable from "./ResourceTable";
-import { fetchHealthSummary } from "../../../services/api";
+import {
+  Box,
+  Grid,
+  CircularProgress,
+  Typography,
+  Alert,
+  IconButton,
+  Tooltip,
+} from "@mui/material";
+import RefreshIcon from "@mui/icons-material/Refresh";
 
 const HealthSummary = () => {
-  const [healthData, setHealthData] = useState({});
-  const [expanded, setExpanded] = useState(null);
+  const [summary, setSummary] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [expanded, setExpanded] = useState(null);
   const [lastUpdated, setLastUpdated] = useState(null);
 
-  const loadHealthData = async () => {
-    setLoading(true);
+  const loadData = async () => {
     try {
+      setLoading(true);
       const res = await fetchHealthSummary();
-      setHealthData(res);
+      setSummary(res);
       setLastUpdated(new Date().toLocaleTimeString());
     } catch (err) {
-      console.error("Error fetching health summary:", err);
+      console.error("Failed to fetch health summary:", err);
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    loadHealthData();
-    const interval = setInterval(loadHealthData, 60000); // auto-refresh every 60s
+    loadData();
+   // const interval = setInterval(() => loadData(), 60000); // Auto-refresh every 60s
+    const interval = setInterval(() => loadData(), 1800000); // Auto-refresh every 30 minutes
     return () => clearInterval(interval);
   }, []);
 
@@ -32,64 +44,54 @@ const HealthSummary = () => {
     setExpanded(expanded === key ? null : key);
   };
 
-  const cards = [
-    {
-      title: "CrashLoopBackOff Pods",
-      key: "crashLoopBackOffPods",
-      count: healthData.crashLoopBackOffPods?.length || 0,
-      icon: "💥",
-    },
-    {
-      title: "Failed Jobs",
-      key: "failedJobs",
-      count: healthData.failedJobs?.length || 0,
-      icon: "❌",
-    },
-    {
-      title: "NotReady Nodes",
-      key: "notReadyNodes",
-      count: healthData.notReadyNodes?.length || 0,
-      icon: "🖥️",
-    },
-    {
-      title: "Unhealthy Deployments",
-      key: "unhealthyDeployments",
-      count: healthData.unhealthyDeployments?.length || 0,
-      icon: "⚠️",
-    },
-  ];
+  if (loading && !summary) {
+    return (
+      <Box textAlign="center" mt={5}>
+        <CircularProgress color="primary" />
+        <Typography variant="h6" mt={2}>
+          Loading cluster health data...
+        </Typography>
+      </Box>
+    );
+  }
 
   return (
-    <div className="p-6 text-white">
-      <h2 className="text-2xl font-bold mb-6">Cluster Health Summary</h2>
-      {loading && <div className="text-sm text-gray-300 mb-4">Loading health data...</div>}
-      {!loading && (
-        <div className="text-sm text-gray-400 mb-4">
-          Last Updated: {lastUpdated}
-        </div>
-      )}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        {cards.map(({ title, count, key, icon }) => (
-          <SummaryCard
-            key={key}
-            title={title}
-            count={count}
-            icon={icon}
-            isExpanded={expanded === key}
-            onClick={() => toggleExpand(key)}
-          />
-        ))}
-      </div>
+    <Box p={3}>
+      <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
+        <Typography variant="h5" fontWeight="bold">
+          Cluster Health Summary
+        </Typography>
+        <Tooltip title="Refresh Now">
+          <IconButton onClick={loadData}>
+            <RefreshIcon />
+          </IconButton>
+        </Tooltip>
+      </Box>
 
-      {expanded && (
-        <div>
-          <h3 className="text-lg font-semibold mb-2">
-            {cards.find((c) => c.key === expanded)?.title} Details
-          </h3>
-          <ResourceTable data={healthData[expanded]} type={expanded} />
-        </div>
+      <Grid container spacing={2}>
+        {summary &&
+          Object.entries(summary).map(([key, value]) => (
+            <Grid item xs={12} md={6} key={key}>
+              <SummaryCard
+                title={key}
+                count={value?.length || 0}
+                onClick={() => toggleExpand(key)}
+              />
+              {expanded === key && (
+                <ResourceTable title={key} resources={value} />
+              )}
+            </Grid>
+          ))}
+      </Grid>
+
+      {lastUpdated && (
+        <Box mt={3} textAlign="right">
+          <Typography variant="caption" color="textSecondary">
+            Last updated at {lastUpdated}
+          </Typography>
+        </Box>
       )}
-    </div>
+    </Box>
   );
 };
 

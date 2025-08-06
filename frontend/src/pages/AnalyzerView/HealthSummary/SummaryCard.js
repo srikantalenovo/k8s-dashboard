@@ -1,44 +1,63 @@
 // src/pages/AnalyzerView/HealthSummary/SummaryCard.js
-
 import React from "react";
-import { Info, ChevronDown, ChevronUp } from "lucide-react";
+import {
+  Card,
+  CardContent,
+  Typography,
+  Box,
+  IconButton,
+  Tooltip,
+} from "@mui/material";
+import WarningIcon from "@mui/icons-material/Warning";
+import ErrorOutlineIcon from "@mui/icons-material/ErrorOutline";
 
-const SummaryCard = ({ title, count, isOpen, onClick }) => {
-  const getColor = () => {
-    if (title.includes("CrashLoop")) return "bg-red-500";
-    if (title.includes("Failed")) return "bg-yellow-500";
-    if (title.includes("NotReady")) return "bg-orange-500";
-    if (title.includes("Unhealthy")) return "bg-pink-500";
-    return "bg-blue-500";
-  };
+const statusColors = {
+  CrashLoopBackOff: "#f44336",
+  FailedJobs: "#ff9800",
+  NotReadyNodes: "#3f51b5",
+  UnhealthyDeployments: "#9c27b0",
+};
+
+const icons = {
+  CrashLoopBackOff: <ErrorOutlineIcon />,
+  FailedJobs: <WarningIcon />,
+  NotReadyNodes: <ErrorOutlineIcon />,
+  UnhealthyDeployments: <WarningIcon />,
+};
+
+const SummaryCard = ({ title, count, onClick }) => {
+  const color = statusColors[title] || "#607d8b";
+  const icon = icons[title] || <ErrorOutlineIcon />;
 
   return (
-    <div
+    <Card
       onClick={onClick}
-      className="relative cursor-pointer bg-white/10 backdrop-blur-sm border border-white/20 shadow-lg rounded-xl p-5 mb-6 transition hover:shadow-2xl hover:scale-[1.015]"
+      sx={{
+        borderLeft: `6px solid ${color}`,
+        cursor: "pointer",
+        boxShadow: 3,
+        transition: "transform 0.2s",
+        "&:hover": {
+          transform: "scale(1.02)",
+          boxShadow: 6,
+        },
+      }}
     >
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <div className={`p-2 rounded-full ${getColor()} bg-opacity-80`}>
-            <Info className="w-5 h-5 text-white" />
-          </div>
-          <div>
-            <h3 className="text-white text-sm font-medium">{title}</h3>
-            <p className="text-white text-2xl font-extrabold">{count}</p>
-          </div>
-        </div>
-        {count > 0 && (
-          <div className="text-white">
-            {isOpen ? <ChevronUp /> : <ChevronDown />}
-          </div>
-        )}
-      </div>
-
-      {/* Gradient ring on hover */}
-      <div className="absolute -inset-[2px] rounded-xl bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 opacity-0 group-hover:opacity-100 blur-sm transition" />
-    </div>
+      <CardContent>
+        <Box display="flex" justifyContent="space-between" alignItems="center">
+          <Box>
+            <Typography variant="h6" fontWeight="bold" gutterBottom>
+              {title}
+            </Typography>
+            <Typography variant="h4" color={color} fontWeight="bold">
+              {count}
+            </Typography>
+          </Box>
+          <Tooltip title={title}>{icon}</Tooltip>
+        </Box>
+      </CardContent>
+    </Card>
   );
 };
 
 export default SummaryCard;
-
