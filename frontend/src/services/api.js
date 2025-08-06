@@ -31,4 +31,13 @@ api.interceptors.request.use(
   error => Promise.reject(error)
 );
 
+// src/api.js (or wherever your API helpers live)
+export const fetchHealthSummary = async () => {
+  const response = await fetch("/api/k8s/analyzer/health-summary");
+  if (!response.ok) {
+    throw new Error("Failed to fetch health summary");
+  }
+  return await response.json();
+};
+
 export default api;

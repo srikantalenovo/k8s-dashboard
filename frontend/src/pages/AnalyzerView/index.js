@@ -7,7 +7,6 @@ const AnalyzerView = () => {
       {/* Sidebar (Optional Static Label) */}
       <div className="w-52 min-w-52 bg-gray-100 dark:bg-gray-800 p-4 border-r">
         <div className="text-lg font-semibold text-gray-700 dark:text-gray-200">
-          Analyzer
         </div>
       </div>
 

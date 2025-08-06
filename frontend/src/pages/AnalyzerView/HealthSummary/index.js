@@ -1,58 +1,86 @@
-import React, { useEffect, useState } from "react";
+import React, { useState, useEffect } from "react";
 import SummaryCard from "./SummaryCard";
 import ResourceTable from "./ResourceTable";
-import "./styles.css"; // we'll define custom loader style here
+import { fetchHealthSummary } from "../../../api";
 
-const HealthSummary = ({ selectedNamespace }) => {
-  const [healthData, setHealthData] = useState(null);
+const categories = [
+  { key: "crashLoopBackOffPods", title: "CrashLoopBackOff Pods" },
+  { key: "failedJobs", title: "Failed Jobs" },
+  { key: "notReadyNodes", title: "NotReady Nodes" },
+  { key: "unhealthyDeployments", title: "Unhealthy Deployments" },
+];
+
+const HealthSummary = () => {
+  const [healthData, setHealthData] = useState({});
   const [loading, setLoading] = useState(true);
+  const [selectedCategory, setSelectedCategory] = useState(null);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  const loadHealthData = async () => {
+    setIsRefreshing(true);
+    try {
+      const summary = await fetchHealthSummary();
+      setHealthData(summary);
+    } catch (error) {
+      console.error("Failed to fetch health summary:", error);
+    } finally {
+      setLoading(false);
+      setIsRefreshing(false);
+    }
+  };
 
   useEffect(() => {
-    const fetchHealthData = async () => {
-      try {
-        const response = await fetch("/api/k8s/analyzer/health-summary");
-        const data = await response.json();
-        setHealthData(data);
-      } catch (error) {
-        console.error("Failed to fetch health summary:", error);
-        setHealthData(null);
-      } finally {
-        setLoading(false);
-      }
-    };
+    loadHealthData();
+    const interval = setInterval(() => {
+      loadHealthData();
+    }, 60000); // refresh every 60 seconds
 
-    fetchHealthData();
-  }, [selectedNamespace]);
+    return () => clearInterval(interval); // cleanup on unmount
+  }, []);
+
+  const handleCardClick = (key) => {
+    setSelectedCategory((prev) => (prev === key ? null : key));
+  };
 
   if (loading) {
     return (
-      <div className="health-loader-container">
-        <div className="spinner" />
-        <p className="loader-text">Loading cluster health data...</p>
+      <div className="flex justify-center items-center h-40">
+        <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-500"></div>
+        <span className="ml-4 text-gray-600 text-lg">Loading cluster health data...</span>
       </div>
     );
   }
 
-  if (!healthData) {
-    return <p style={{ padding: "1rem", color: "red" }}>Failed to load data.</p>;
-  }
-
   return (
-    <div className="health-summary-container">
-      <h2 className="summary-heading">Cluster Health Summary</h2>
-      <div className="summary-card-grid">
-        <SummaryCard title="CrashLoopBackOff Pods" count={healthData.crashLoopBackOffPods.length} />
-        <SummaryCard title="Failed Jobs" count={healthData.failedJobs.length} />
-        <SummaryCard title="NotReady Nodes" count={healthData.notReadyNodes.length} />
-        <SummaryCard title="Unhealthy Deployments" count={healthData.unhealthyDeployments.length} />
+    <div className="space-y-6">
+      <div className="flex justify-between items-center">
+        <h2 className="text-2xl font-bold text-gray-800">Cluster Health Summary</h2>
+        {isRefreshing && (
+          <span className="text-sm text-blue-500 animate-pulse">Refreshing...</span>
+        )}
       </div>
 
-      <div className="table-section">
-        <ResourceTable title="CrashLoopBackOff Pods" data={healthData.crashLoopBackOffPods} />
-        <ResourceTable title="Failed Jobs" data={healthData.failedJobs} />
-        <ResourceTable title="NotReady Nodes" data={healthData.notReadyNodes} />
-        <ResourceTable title="Unhealthy Deployments" data={healthData.unhealthyDeployments} />
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {categories.map(({ key, title }) => (
+          <SummaryCard
+            key={key}
+            title={title}
+            count={healthData[key]?.length || 0}
+            iconKey={key}
+            isSelected={selectedCategory === key}
+            onClick={() => handleCardClick(key)}
+          />
+        ))}
       </div>
+
+      {selectedCategory && (
+        <div className="transition-all duration-300">
+          <h3 className="text-xl font-semibold text-gray-800 mb-3">
+            {categories.find((c) => c.key === selectedCategory).title} Details
+          </h3>
+          <ResourceTable resources={healthData[selectedCategory]} />
+        </div>
+      )}
     </div>
   );
 };
