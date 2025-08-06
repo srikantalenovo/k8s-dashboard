@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import SummaryCard from "./SummaryCard";
 import ResourceTable from "./ResourceTable";
-import { fetchHealthSummary } from "../../../api";
+import { fetchHealthSummary } from "../../../services/api";
 
 const categories = [
   { key: "crashLoopBackOffPods", title: "CrashLoopBackOff Pods" },
