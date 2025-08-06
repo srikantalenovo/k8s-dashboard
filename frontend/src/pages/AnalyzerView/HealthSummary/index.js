@@ -1,63 +1,58 @@
-// src/pages/AnalyzerView/HealthSummary/index.js
-import React from "react";
+import React, { useEffect, useState } from "react";
+import SummaryCard from "./SummaryCard";
 import ResourceTable from "./ResourceTable";
-import useHealthData from "./useHealthData";
-import { Loader2 } from "lucide-react";
+import "./styles.css"; // we'll define custom loader style here
 
-const HealthSummary = () => {
-  const {
-    crashLoopPods,
-    failedJobs,
-    notReadyNodes,
-    unhealthyDeployments,
-    loading,
-    error,
-  } = useHealthData();
+const HealthSummary = ({ selectedNamespace }) => {
+  const [healthData, setHealthData] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchHealthData = async () => {
+      try {
+        const response = await fetch("/api/k8s/analyzer/health-summary");
+        const data = await response.json();
+        setHealthData(data);
+      } catch (error) {
+        console.error("Failed to fetch health summary:", error);
+        setHealthData(null);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchHealthData();
+  }, [selectedNamespace]);
+
+  if (loading) {
+    return (
+      <div className="health-loader-container">
+        <div className="spinner" />
+        <p className="loader-text">Loading cluster health data...</p>
+      </div>
+    );
+  }
+
+  if (!healthData) {
+    return <p style={{ padding: "1rem", color: "red" }}>Failed to load data.</p>;
+  }
 
   return (
-    <div className="p-4">
-      <h1 className="text-2xl font-bold mb-6 text-gray-800">Cluster Health Summary</h1>
+    <div className="health-summary-container">
+      <h2 className="summary-heading">Cluster Health Summary</h2>
+      <div className="summary-card-grid">
+        <SummaryCard title="CrashLoopBackOff Pods" count={healthData.crashLoopBackOffPods.length} />
+        <SummaryCard title="Failed Jobs" count={healthData.failedJobs.length} />
+        <SummaryCard title="NotReady Nodes" count={healthData.notReadyNodes.length} />
+        <SummaryCard title="Unhealthy Deployments" count={healthData.unhealthyDeployments.length} />
+      </div>
 
-      {loading && (
-        <div className="flex items-center gap-2 text-gray-600">
-          <Loader2 className="animate-spin w-5 h-5" />
-          Loading cluster health data...
-        </div>
-      )}
-
-      {error && (
-        <div className="text-red-600 mb-4">
-          ⚠️ Failed to load data: {error}
-        </div>
-      )}
-
-      {!loading && !error && (
-        <>
-          <ResourceTable
-            title="CrashLoopBackOff Pods"
-            items={crashLoopPods}
-            type="pod"
-          />
-
-          <ResourceTable
-            title="Failed Jobs"
-            items={failedJobs}
-            type="job"
-          />
-
-          <ResourceTable
-            title="NotReady Nodes"
-            items={notReadyNodes}
-            type="node"
-          />
-
-          <ResourceTable
-            title="Unhealthy Deployments"
-            items={unhealthyDeployments}
-            type="deployment"
-          />
-        </>
-      )}
+      <div className="table-section">
+        <ResourceTable title="CrashLoopBackOff Pods" data={healthData.crashLoopBackOffPods} />
+        <ResourceTable title="Failed Jobs" data={healthData.failedJobs} />
+        <ResourceTable title="NotReady Nodes" data={healthData.notReadyNodes} />
+        <ResourceTable title="Unhealthy Deployments" data={healthData.unhealthyDeployments} />
+      </div>
     </div>
   );
 };
