@@ -7,7 +7,7 @@ import ListAltIcon from "@mui/icons-material/ListAlt";
 import TerminalIcon from "@mui/icons-material/Terminal";
 import Sidebar from "../components/Sidebar";
 import MotionPaper from "../components/MotionPaper";
-import { useAuth } from "../context/AuthContext";
+import { AuthContext } from "../context/AuthContext";
 
 // Importing modular views
 import ResourcesView from "../pages/ResourcesView"; // ✅ NEW import
@@ -41,7 +41,7 @@ const ViewContainer = styled(MotionPaper)({
 
 const Dashboard = () => {
   const [selectedView, setSelectedView] = useState("home");
-  const { user } = useContext(useAuth);
+  const { user } = useContext(AuthContext);
 
   const checkPermission = (permission) => {
     return user?.permissions?.includes(permission);
