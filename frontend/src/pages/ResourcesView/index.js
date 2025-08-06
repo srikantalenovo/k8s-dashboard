@@ -1,6 +1,35 @@
 
 import React, { useState, useEffect } from 'react';
 
+import {
+  Box, Typography, Select, MenuItem, Table, TableBody, Tooltip, FormControl, InputLabel, Alert,
+  TableCell, TableContainer, TableHead, TableRow, Button, IconButton, Paper, Grid,
+  Avatar, LinearProgress, styled, Container, useTheme, Popover,
+  Dialog, DialogTitle, DialogContent, DialogActions, List,
+  ListItem, ListItemText, ListItemIcon, Checkbox, FormControlLabel
+} from '@mui/material';
+import {
+  Home as HomeIcon,
+  Analytics as AnalyticsIcon,
+  Folder as ResourcesIcon,
+  List as LogsIcon,
+  ExitToApp as SignOutIcon,
+  Dashboard as DashboardIcon,
+  Storage as ClusterIcon,
+  Dns as NodeIcon,
+  ShowChart as MetricsIcon,
+  Storage as StorageIcon,
+  Folder as NamespaceIcon,
+  Dns as PodIcon,
+  Apps as AppsIcon,
+  Refresh as RefreshIcon,
+  People as PeopleIcon,
+  AdminPanelSettings as AdminPanelSettingsIcon,
+  Edit as EditIcon,
+  Visibility as VisibilityIcon
+} from '@mui/icons-material';
+import { motion } from 'framer-motion';
+
 const ResourcesView = ({ currentUser }) => {
   const [resourceType, setResourceType] = useState('nodes');
   const [namespace, setNamespace] = useState('default');
