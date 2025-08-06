@@ -1,67 +1,73 @@
-// src/pages/AnalyzerView/HealthSummary/ResourceTable.js
 import React, { useState } from "react";
 import {
-  Paper,
   Table,
-  TableBody,
-  TableCell,
-  TableContainer,
   TableHead,
   TableRow,
+  TableCell,
+  TableBody,
+  Paper,
+  TableContainer,
   Typography,
   TextField,
-  Chip,
+  Box,
 } from "@mui/material";
 
-const ResourceTable = ({ title, resources }) => {
+const ResourceTable = ({ title, data }) => {
   const [search, setSearch] = useState("");
 
-  const filtered = resources?.filter((res) =>
-    JSON.stringify(res).toLowerCase().includes(search.toLowerCase())
+  const filteredData = data.filter((item) =>
+    Object.values(item).some((val) =>
+      String(val).toLowerCase().includes(search.toLowerCase())
+    )
   );
 
   return (
-    <TableContainer component={Paper} sx={{ mt: 2 }}>
-      <Typography variant="h6" sx={{ p: 2 }}>
-        {title} Details
+    <Box mt={4}>
+      <Typography variant="h6" gutterBottom>
+        {title}
       </Typography>
+
       <TextField
         label="Search"
         variant="outlined"
         size="small"
         fullWidth
-        sx={{ px: 2, pb: 2 }}
+        margin="normal"
+        value={search}
         onChange={(e) => setSearch(e.target.value)}
       />
-      <Table size="small">
-        <TableHead>
-          <TableRow>
-            {Object.keys(filtered?.[0] || {}).map((key) => (
-              <TableCell key={key} sx={{ fontWeight: "bold" }}>
-                {key}
-              </TableCell>
-            ))}
-          </TableRow>
-        </TableHead>
-        <TableBody>
-          {filtered?.map((item, idx) => (
-            <TableRow key={idx}>
-              {Object.entries(item).map(([key, val], i) => (
-                <TableCell key={i}>
-                  {typeof val === "string" && val.toLowerCase().includes("fail") ? (
-                    <Chip label={val} color="error" size="small" />
-                  ) : typeof val === "string" && val.toLowerCase().includes("ready") ? (
-                    <Chip label={val} color="success" size="small" />
-                  ) : (
-                    val?.toString()
-                  )}
-                </TableCell>
-              ))}
+
+      <TableContainer component={Paper}>
+        <Table>
+          <TableHead sx={{ backgroundColor: "#f5f5f5" }}>
+            <TableRow>
+              {data.length > 0 &&
+                Object.keys(data[0]).map((key) => (
+                  <TableCell key={key} sx={{ fontWeight: "bold" }}>
+                    {key}
+                  </TableCell>
+                ))}
             </TableRow>
-          ))}
-        </TableBody>
-      </Table>
-    </TableContainer>
+          </TableHead>
+          <TableBody>
+            {filteredData.map((row, index) => (
+              <TableRow key={index} hover>
+                {Object.values(row).map((val, i) => (
+                  <TableCell key={i}>{String(val)}</TableCell>
+                ))}
+              </TableRow>
+            ))}
+            {filteredData.length === 0 && (
+              <TableRow>
+                <TableCell colSpan={10} align="center">
+                  No matching results found.
+                </TableCell>
+              </TableRow>
+            )}
+          </TableBody>
+        </Table>
+      </TableContainer>
+    </Box>
   );
 };
 

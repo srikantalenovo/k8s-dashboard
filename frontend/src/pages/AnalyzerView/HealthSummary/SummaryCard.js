@@ -1,59 +1,50 @@
-// src/pages/AnalyzerView/HealthSummary/SummaryCard.js
 import React from "react";
 import {
   Card,
   CardContent,
   Typography,
   Box,
-  IconButton,
-  Tooltip,
+  Avatar,
 } from "@mui/material";
-import WarningIcon from "@mui/icons-material/Warning";
-import ErrorOutlineIcon from "@mui/icons-material/ErrorOutline";
+import {
+  Dns as NodeIcon,
+  Apps as AppsIcon,
+  Storage as PodIcon,
+} from "@mui/icons-material";
 
-const statusColors = {
-  CrashLoopBackOff: "#f44336",
-  FailedJobs: "#ff9800",
-  NotReadyNodes: "#3f51b5",
-  UnhealthyDeployments: "#9c27b0",
+const iconMap = {
+  Node: <NodeIcon />,
+  Apps: <AppsIcon />,
+  Pod: <PodIcon />,
 };
 
-const icons = {
-  CrashLoopBackOff: <ErrorOutlineIcon />,
-  FailedJobs: <WarningIcon />,
-  NotReadyNodes: <ErrorOutlineIcon />,
-  UnhealthyDeployments: <WarningIcon />,
-};
-
-const SummaryCard = ({ title, count, onClick }) => {
-  const color = statusColors[title] || "#607d8b";
-  const icon = icons[title] || <ErrorOutlineIcon />;
-
+const SummaryCard = ({ title, count, icon, gradient, onClick }) => {
   return (
     <Card
       onClick={onClick}
       sx={{
-        borderLeft: `6px solid ${color}`,
         cursor: "pointer",
-        boxShadow: 3,
+        background: gradient,
+        color: "#fff",
         transition: "transform 0.2s",
         "&:hover": {
-          transform: "scale(1.02)",
-          boxShadow: 6,
+          transform: "scale(1.03)",
         },
       }}
     >
       <CardContent>
-        <Box display="flex" justifyContent="space-between" alignItems="center">
+        <Box display="flex" alignItems="center" justifyContent="space-between">
           <Box>
-            <Typography variant="h6" fontWeight="bold" gutterBottom>
+            <Typography variant="subtitle2" gutterBottom>
               {title}
             </Typography>
-            <Typography variant="h4" color={color} fontWeight="bold">
+            <Typography variant="h5" fontWeight={700}>
               {count}
             </Typography>
           </Box>
-          <Tooltip title={title}>{icon}</Tooltip>
+          <Avatar sx={{ bgcolor: "rgba(255,255,255,0.2)" }}>
+            {iconMap[icon]}
+          </Avatar>
         </Box>
       </CardContent>
     </Card>

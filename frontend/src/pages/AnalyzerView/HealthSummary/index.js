@@ -1,54 +1,57 @@
-// src/pages/AnalyzerView/HealthSummary/index.js
 import React, { useEffect, useState } from "react";
-import { fetchHealthSummary } from "../../../services/api";
 import SummaryCard from "./SummaryCard";
 import ResourceTable from "./ResourceTable";
+import { fetchHealthSummary } from "../../../services/api";
+import RefreshIcon from "@mui/icons-material/Refresh";
 import {
   Box,
   Grid,
-  CircularProgress,
   Typography,
-  Alert,
   IconButton,
-  Tooltip,
+  CircularProgress,
+  Collapse,
 } from "@mui/material";
-import RefreshIcon from "@mui/icons-material/Refresh";
 
 const HealthSummary = () => {
-  const [summary, setSummary] = useState(null);
+  const [healthData, setHealthData] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [expanded, setExpanded] = useState(null);
+  const [expandedSection, setExpandedSection] = useState(null);
   const [lastUpdated, setLastUpdated] = useState(null);
 
-  const loadData = async () => {
+  const fetchData = async () => {
     try {
       setLoading(true);
-      const res = await fetchHealthSummary();
-      setSummary(res);
-      setLastUpdated(new Date().toLocaleTimeString());
-    } catch (err) {
-      console.error("Failed to fetch health summary:", err);
+      const data = await fetchHealthSummary();
+      setHealthData(data);
+      setLastUpdated(new Date());
+    } catch (error) {
+      console.error("Failed to fetch health summary:", error);
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    loadData();
-   // const interval = setInterval(() => loadData(), 60000); // Auto-refresh every 60s
-    const interval = setInterval(() => loadData(), 1800000); // Auto-refresh every 30 minutes
+    fetchData();
+    const interval = setInterval(() => {
+      fetchData();
+    }, 30 * 60 * 1000); // 30 minutes
     return () => clearInterval(interval);
   }, []);
 
-  const toggleExpand = (key) => {
-    setExpanded(expanded === key ? null : key);
+  const toggleSection = (section) => {
+    setExpandedSection((prev) => (prev === section ? null : section));
   };
 
-  if (loading && !summary) {
+  const formatTime = (date) => {
+    return date?.toLocaleTimeString();
+  };
+
+  if (loading) {
     return (
-      <Box textAlign="center" mt={5}>
-        <CircularProgress color="primary" />
-        <Typography variant="h6" mt={2}>
+      <Box textAlign="center" mt={4}>
+        <CircularProgress />
+        <Typography variant="body2" mt={2}>
           Loading cluster health data...
         </Typography>
       </Box>
@@ -57,40 +60,74 @@ const HealthSummary = () => {
 
   return (
     <Box p={3}>
-      <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
-        <Typography variant="h5" fontWeight="bold">
+      <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
+        <Typography variant="h5" fontWeight={600}>
           Cluster Health Summary
         </Typography>
-        <Tooltip title="Refresh Now">
-          <IconButton onClick={loadData}>
+        <Box display="flex" alignItems="center" gap={1}>
+          <Typography variant="body2" color="textSecondary">
+            Last updated: {formatTime(lastUpdated)}
+          </Typography>
+          <IconButton onClick={fetchData} color="primary">
             <RefreshIcon />
           </IconButton>
-        </Tooltip>
+        </Box>
       </Box>
 
-      <Grid container spacing={2}>
-        {summary &&
-          Object.entries(summary).map(([key, value]) => (
-            <Grid item xs={12} md={6} key={key}>
-              <SummaryCard
-                title={key}
-                count={value?.length || 0}
-                onClick={() => toggleExpand(key)}
-              />
-              {expanded === key && (
-                <ResourceTable title={key} resources={value} />
-              )}
-            </Grid>
-          ))}
+      <Grid container spacing={3}>
+        <Grid item xs={12} sm={6} md={3}>
+          <SummaryCard
+            title="CrashLoopBackOff Pods"
+            count={healthData?.crashLoopBackOffPods?.length || 0}
+            icon="Pod"
+            gradient="linear-gradient(to right, #ff758c, #ff7eb3)"
+            onClick={() => toggleSection("pods")}
+          />
+        </Grid>
+        <Grid item xs={12} sm={6} md={3}>
+          <SummaryCard
+            title="Failed Jobs"
+            count={healthData?.failedJobs?.length || 0}
+            icon="Apps"
+            gradient="linear-gradient(to right, #4158d0, #c850c0)"
+            onClick={() => toggleSection("jobs")}
+          />
+        </Grid>
+        <Grid item xs={12} sm={6} md={3}>
+          <SummaryCard
+            title="NotReady Nodes"
+            count={healthData?.notReadyNodes?.length || 0}
+            icon="Node"
+            gradient="linear-gradient(to right, #00c6ff, #0072ff)"
+            onClick={() => toggleSection("nodes")}
+          />
+        </Grid>
+        <Grid item xs={12} sm={6} md={3}>
+          <SummaryCard
+            title="Unhealthy Deployments"
+            count={healthData?.unhealthyDeployments?.length || 0}
+            icon="Apps"
+            gradient="linear-gradient(to right, #f7971e, #ffd200)"
+            onClick={() => toggleSection("deployments")}
+          />
+        </Grid>
       </Grid>
 
-      {lastUpdated && (
-        <Box mt={3} textAlign="right">
-          <Typography variant="caption" color="textSecondary">
-            Last updated at {lastUpdated}
-          </Typography>
-        </Box>
-      )}
+      <Collapse in={expandedSection === "pods"} timeout="auto" unmountOnExit>
+        <ResourceTable title="CrashLoopBackOff Pods" data={healthData?.crashLoopBackOffPods || []} />
+      </Collapse>
+
+      <Collapse in={expandedSection === "jobs"} timeout="auto" unmountOnExit>
+        <ResourceTable title="Failed Jobs" data={healthData?.failedJobs || []} />
+      </Collapse>
+
+      <Collapse in={expandedSection === "nodes"} timeout="auto" unmountOnExit>
+        <ResourceTable title="NotReady Nodes" data={healthData?.notReadyNodes || []} />
+      </Collapse>
+
+      <Collapse in={expandedSection === "deployments"} timeout="auto" unmountOnExit>
+        <ResourceTable title="Unhealthy Deployments" data={healthData?.unhealthyDeployments || []} />
+      </Collapse>
     </Box>
   );
 };
