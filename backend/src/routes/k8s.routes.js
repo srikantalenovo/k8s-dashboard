@@ -220,4 +220,21 @@ router.post('/pods/:name/restart', authorize(['admin', 'editor']), noCache, asyn
   }
 });
 
+
+
+// Analyzer Health Summary Route
+// --------------------------------------------
+import express from 'express';
+import { getClusterHealthSummary } from '../utils/analyzerHelper.js';
+
+router.get('/analyzer/health-summary', async (req, res) => {
+  try {
+    const summary = await getClusterHealthSummary();
+    res.json(summary);
+  } catch (error) {
+    console.error('Error in /analyzer/health-summary:', error);
+    res.status(500).json({ error: 'Failed to get cluster health summary' });
+  }
+});
+
 export default router;
