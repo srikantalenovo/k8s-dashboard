@@ -31,6 +31,7 @@ import {
 } from '@mui/icons-material';
 
 import ResourcesView from '../pages/ResourcesView';
+import AnalyzerView from '../pages/AnalyzerView';
 
 
 
@@ -334,13 +335,13 @@ const HomeView = () => (
   </Box>
 );
 
-const AnalyzerView = () => (
-  <Box>
-    <Typography variant="h4" gutterBottom sx={{ color: 'white' }}>
-      Cluster Analyzer
-    </Typography>
-  </Box>
-);
+// const AnalyzerView = () => (
+//   <Box>
+//     <Typography variant="h4" gutterBottom sx={{ color: 'white' }}>
+//       Cluster Analyzer
+//     </Typography>
+//   </Box>
+// );
 // ResourcesView Starting
 
 
