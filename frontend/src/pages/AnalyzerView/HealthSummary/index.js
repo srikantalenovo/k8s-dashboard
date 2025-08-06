@@ -1,84 +1,92 @@
-import React, { useState, useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import SummaryCard from "./SummaryCard";
 import ResourceTable from "./ResourceTable";
 import { fetchHealthSummary } from "../../../services/api";
 
-const categories = [
-  { key: "crashLoopBackOffPods", title: "CrashLoopBackOff Pods" },
-  { key: "failedJobs", title: "Failed Jobs" },
-  { key: "notReadyNodes", title: "NotReady Nodes" },
-  { key: "unhealthyDeployments", title: "Unhealthy Deployments" },
-];
-
 const HealthSummary = () => {
   const [healthData, setHealthData] = useState({});
+  const [expanded, setExpanded] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [selectedCategory, setSelectedCategory] = useState(null);
-  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [lastUpdated, setLastUpdated] = useState(null);
 
   const loadHealthData = async () => {
-    setIsRefreshing(true);
+    setLoading(true);
     try {
-      const summary = await fetchHealthSummary();
-      setHealthData(summary);
-    } catch (error) {
-      console.error("Failed to fetch health summary:", error);
+      const res = await fetchHealthSummary();
+      setHealthData(res);
+      setLastUpdated(new Date().toLocaleTimeString());
+    } catch (err) {
+      console.error("Error fetching health summary:", err);
     } finally {
       setLoading(false);
-      setIsRefreshing(false);
     }
   };
 
   useEffect(() => {
     loadHealthData();
-    const interval = setInterval(() => {
-      loadHealthData();
-    }, 60000); // refresh every 60 seconds
-
-    return () => clearInterval(interval); // cleanup on unmount
+    const interval = setInterval(loadHealthData, 60000); // auto-refresh every 60s
+    return () => clearInterval(interval);
   }, []);
 
-  const handleCardClick = (key) => {
-    setSelectedCategory((prev) => (prev === key ? null : key));
+  const toggleExpand = (key) => {
+    setExpanded(expanded === key ? null : key);
   };
 
-  if (loading) {
-    return (
-      <div className="flex justify-center items-center h-40">
-        <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-500"></div>
-        <span className="ml-4 text-gray-600 text-lg">Loading cluster health data...</span>
-      </div>
-    );
-  }
+  const cards = [
+    {
+      title: "CrashLoopBackOff Pods",
+      key: "crashLoopBackOffPods",
+      count: healthData.crashLoopBackOffPods?.length || 0,
+      icon: "💥",
+    },
+    {
+      title: "Failed Jobs",
+      key: "failedJobs",
+      count: healthData.failedJobs?.length || 0,
+      icon: "❌",
+    },
+    {
+      title: "NotReady Nodes",
+      key: "notReadyNodes",
+      count: healthData.notReadyNodes?.length || 0,
+      icon: "🖥️",
+    },
+    {
+      title: "Unhealthy Deployments",
+      key: "unhealthyDeployments",
+      count: healthData.unhealthyDeployments?.length || 0,
+      icon: "⚠️",
+    },
+  ];
 
   return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <h2 className="text-2xl font-bold text-gray-800">Cluster Health Summary</h2>
-        {isRefreshing && (
-          <span className="text-sm text-blue-500 animate-pulse">Refreshing...</span>
-        )}
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {categories.map(({ key, title }) => (
+    <div className="p-6 text-white">
+      <h2 className="text-2xl font-bold mb-6">Cluster Health Summary</h2>
+      {loading && <div className="text-sm text-gray-300 mb-4">Loading health data...</div>}
+      {!loading && (
+        <div className="text-sm text-gray-400 mb-4">
+          Last Updated: {lastUpdated}
+        </div>
+      )}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+        {cards.map(({ title, count, key, icon }) => (
           <SummaryCard
             key={key}
             title={title}
-            count={healthData[key]?.length || 0}
-            iconKey={key}
-            isSelected={selectedCategory === key}
-            onClick={() => handleCardClick(key)}
+            count={count}
+            icon={icon}
+            isExpanded={expanded === key}
+            onClick={() => toggleExpand(key)}
           />
         ))}
       </div>
 
-      {selectedCategory && (
-        <div className="transition-all duration-300">
-          <h3 className="text-xl font-semibold text-gray-800 mb-3">
-            {categories.find((c) => c.key === selectedCategory).title} Details
+      {expanded && (
+        <div>
+          <h3 className="text-lg font-semibold mb-2">
+            {cards.find((c) => c.key === expanded)?.title} Details
           </h3>
-          <ResourceTable resources={healthData[selectedCategory]} />
+          <ResourceTable data={healthData[expanded]} type={expanded} />
         </div>
       )}
     </div>
