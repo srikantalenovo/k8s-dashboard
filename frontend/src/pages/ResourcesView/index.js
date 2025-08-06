@@ -8,7 +8,7 @@ import {
 } from '@mui/material';
 import { Refresh as RefreshIcon } from '@mui/icons-material';
 import  MotionPaper  from '../../components/MotionPaper'; // Optional: Move MotionPaper to shared component
-import  hasPermission  from '../../utils/permissions'; // Optional: Move RBAC util
+import { hasPermission }  from '../../utils/permissions'; // Optional: Move RBAC util
 
 const ResourcesView = ({ currentUser }) => {
   const [resourceType, setResourceType] = useState('nodes');
