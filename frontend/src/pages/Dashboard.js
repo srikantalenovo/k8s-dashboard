@@ -30,7 +30,7 @@ import {
   Visibility as VisibilityIcon
 } from '@mui/icons-material';
 
-import ResourcesView from "../ResourcesView";
+import ResourcesView from '../pages/ResourcesView';
 
 
 
