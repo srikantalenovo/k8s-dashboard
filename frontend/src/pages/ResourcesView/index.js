@@ -29,6 +29,66 @@ import {
   Visibility as VisibilityIcon
 } from '@mui/icons-material';
 import { motion } from 'framer-motion';
+// Permission presets
+const PERMISSION_OPTIONS = [
+  { resource: 'pods', actions: ['read', 'delete'] },
+  { resource: 'nodes', actions: ['read'] },
+  { resource: 'deployments', actions: ['read', 'update'] },
+  { resource: 'logs', actions: ['read'] },
+  { resource: 'cluster', actions: ['read'] },
+  { resource: '*', actions: ['*'] }
+];
+
+const ROLE_PRESETS = {
+  admin: [{ resource: '*', actions: ['*'] }],
+  editor: [
+    { resource: 'pods', actions: ['read', 'delete'] },
+    { resource: 'deployments', actions: ['read', 'update'] },
+    { resource: 'nodes', actions: ['read'] },
+    { resource: 'logs', actions: ['read'] }
+  ],
+  viewer: [
+    { resource: 'pods', actions: ['read'] },
+    { resource: 'deployments', actions: ['read'] },
+    { resource: 'nodes', actions: ['read'] },
+    { resource: 'logs', actions: ['read'] }
+  ]
+};
+
+const hasPermission = (user, resource, action) => {
+  if (!user) return false;
+  if (user.role === 'admin') return true;
+  return user.permissions?.some(
+    perm =>
+      (perm.resource === resource || perm.resource === '*') &&
+      (perm.actions.includes(action) || perm.actions.includes('*'))
+  );
+};
+
+const GradientBox = styled(Box)(({ theme }) => ({
+  minHeight: '100vh',
+  background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+  padding: theme.spacing(2),
+  [theme.breakpoints.up('md')]: {
+    padding: theme.spacing(3)
+  }
+}));
+
+const MotionPaper = ({ children }) => (
+  <motion.div whileHover={{ y: -5 }}>
+    <Paper sx={{
+      backgroundColor: 'rgba(255, 255, 255, 0.05)',
+      backdropFilter: 'blur(5px)',
+      borderRadius: '12px',
+      color: 'white',
+      height: '100%',
+      boxShadow: '0 8px 32px rgba(0, 0, 0, 0.1)',
+      border: '1px solid rgba(255, 255, 255, 0.1)'
+    }}>
+      {children}
+    </Paper>
+  </motion.div>
+);
 
 const ResourcesView = ({ currentUser }) => {
   const [resourceType, setResourceType] = useState('nodes');
