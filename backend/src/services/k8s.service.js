@@ -407,20 +407,43 @@ class K8sService {
  //Analyzer backend code 
 // Add filtered query methods
 async getPods(namespace = 'default', filter) {
-  const pods = await this.listNamespacedPod(namespace);
-  return pods.body.items.filter(pod => {
-    if (filter?.status === 'CrashLoopBackOff') {
-      return pod.status.containerStatuses?.some(cs => 
-        cs.state.waiting?.reason === 'CrashLoopBackOff'
-      );
-    }
-    return true;
-  }).map(p => ({
-    name: p.metadata.name,
-    namespace: p.metadata.namespace,
-    status: 'CrashLoopBackOff',
-    restarts: p.status.containerStatuses?.reduce((acc, cs) => acc + cs.restartCount, 0)
-  }));
+  await this.verifyClusterConnection(); // Ensure connection
+  
+  try {
+    const res = await this.coreV1Api.listNamespacedPod(namespace);
+   
+    const filteredPods = res.body.items.filter(pod => {
+      // Case 1: Filter CrashLoopBackOff pods
+      if (filter?.status === 'CrashLoopBackOff') {
+        return pod.status.containerStatuses?.some(cs => 
+          cs.state?.waiting?.reason === 'CrashLoopBackOff'
+        );
+      }
+      // Case 2: (Add other filters here if needed)
+      return true;
+    });
+
+    return filteredPods.map(p => ({
+      name: p.metadata.name,
+      namespace: p.metadata.namespace,
+      startTime: p.status.startTime,
+      labels: p.metadata.labels || {},
+      status: p.status.phase, // Include actual phase (Running/Failed/etc)
+      containers: p.spec.containers?.map(c => c.name) || [],
+      isCrashLoop: !!pod.status.containerStatuses?.some(cs => 
+        cs.state?.waiting?.reason === 'CrashLoopBackOff'
+      ),
+      restarts: p.status.containerStatuses?.reduce(
+        (acc, cs) => acc + (cs.restartCount || 0), 0
+      ),
+      nodeName: p.spec.nodeName,
+      creationTimestamp: p.metadata.creationTimestamp
+    }));
+    
+  } catch (err) {
+    logger.error(`Failed to fetch pods: ${err.message}`);
+    throw err;
+  }
 }
 
 async getDeployments(namespace = 'default', filter) {

@@ -39,7 +39,8 @@ router.get('/namespaces', authorize(['admin', 'editor', 'viewer']), noCache, asy
 router.get('/pods', authorize(['admin', 'editor', 'viewer']), noCache, async (req, res, next) => {
   try {
     const namespace = req.query.namespace || 'default';
-    const pods = await k8sService.getPods(namespace);
+    const filter = req.query.status ? { status: req.query.status } : undefined;
+    const pods = await k8sService.getPods(namespace, filter);
     res.json(pods);
   } catch (err) {
     next(err);
@@ -48,7 +49,8 @@ router.get('/pods', authorize(['admin', 'editor', 'viewer']), noCache, async (re
 
 router.get('/nodes', authorize(['admin', 'editor', 'viewer']), noCache, async (req, res, next) => {
   try {
-    const nodes = await k8sService.getNodes();
+    const filter = req.query.status ? { status: req.query.status } : undefined;
+    const nodes = await k8sService.getNodes(filter);
     res.json(nodes);
   } catch (err) {
     next(err);
@@ -111,7 +113,8 @@ router.get('/persistentvolumeclaims', authorize(['admin', 'editor', 'viewer']), 
 router.get('/deployments', authorize(['admin', 'editor', 'viewer']), noCache, async (req, res, next) => {
   try {
     const namespace = req.query.namespace || 'default';
-    const deployments = await k8sService.getDeployments(namespace);
+    const filter = req.query.status ? { status: req.query.status } : undefined;
+    const deployments = await k8sService.getDeployments(namespace, filter);
     res.json(deployments);
   } catch (err) {
     next(err);
@@ -179,7 +182,8 @@ router.get('/networkpolicies', authorize(['admin', 'editor', 'viewer']), noCache
 router.get('/jobs', authorize(['admin', 'editor', 'viewer']), noCache, async (req, res, next) => {
   try {
     const namespace = req.query.namespace || 'default';
-    const jobs = await k8sService.getJobs(namespace);
+    const filter = req.query.status ? { status: req.query.status } : undefined;
+    const jobs = await k8sService.getJobs(namespace, filter);
     res.json(jobs);
   } catch (err) {
     next(err);

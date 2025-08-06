@@ -13,7 +13,7 @@ import {
   ListAlt as JobIcon
 } from '@mui/icons-material';
 import { motion } from 'framer-motion';
-import api from '../services/api';
+import api from '../../../services/api';
 
 const MotionPaper = ({ children }) => (
   <motion.div whileHover={{ y: -5 }}>
