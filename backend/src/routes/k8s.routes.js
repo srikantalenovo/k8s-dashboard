@@ -224,7 +224,6 @@ router.post('/pods/:name/restart', authorize(['admin', 'editor']), noCache, asyn
 
 // Analyzer Health Summary Route
 // --------------------------------------------
-import express from 'express';
 import { getClusterHealthSummary } from '../utils/analyzerHelper.js';
 
 router.get('/analyzer/health-summary', async (req, res) => {
