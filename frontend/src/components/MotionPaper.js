@@ -1,21 +1,14 @@
 // src/components/MotionPaper.js
-import React from "react";
 import { Paper } from "@mui/material";
 import { motion } from "framer-motion";
+import { styled } from "@mui/system";
 
-const MotionPaper = motion(Paper);
+// Create a motion-wrapped MUI Paper with custom animation and styling
+const MotionPaper = styled(motion(Paper))({
+  padding: "1rem",
+  borderRadius: "12px",
+  boxShadow: "0 4px 12px rgba(0, 0, 0, 0.1)",
+  backgroundColor: "#ffffff",
+});
 
-const AnimatedPaper = ({ children, ...props }) => {
-  return (
-    <MotionPaper
-      initial={{ opacity: 0, y: 10 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.4 }}
-      {...props}
-    >
-      {children}
-    </MotionPaper>
-  );
-};
-
-export default AnimatedPaper;
+export default MotionPaper;
