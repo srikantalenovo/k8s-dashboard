@@ -236,4 +236,7 @@ router.get('/analyzer/health-summary', async (req, res) => {
   }
 });
 
+import podActionsRoutes from './podActions.routes.js';
+router.use('/analyzer/actions', podActionsRoutes);
+
 export default router;

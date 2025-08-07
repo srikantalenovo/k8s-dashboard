@@ -1,20 +1,39 @@
-import React from "react";
-import HealthSummary from "./HealthSummary";
+import React, { useState } from 'react';
+import { Box, Tabs, Tab, Typography } from '@mui/material';
+import HealthSummary from '../HealthSummary';
+import PodActions from '../PodActions'; // ✅ Import PodActions
 
 const AnalyzerView = () => {
-  return (
-    <div className="flex h-full">
-      {/* Sidebar (Optional Static Label) */}
-      <div className="w-52 min-w-52 bg-gray-100 dark:bg-gray-800 p-4 border-r">
-        <div className="text-lg font-semibold text-gray-700 dark:text-gray-200">
-        </div>
-      </div>
+  const [selectedTab, setSelectedTab] = useState(0);
 
-      {/* Health Summary Content */}
-      <div className="flex-1 p-6 overflow-y-auto">
-        <HealthSummary />
-      </div>
-    </div>
+  const handleTabChange = (event, newValue) => {
+    setSelectedTab(newValue);
+  };
+
+  return (
+    <Box sx={{ width: '100%' }}>
+      <Tabs
+        value={selectedTab}
+        onChange={handleTabChange}
+        aria-label="Analyzer Tabs"
+        sx={{ mb: 3 }}
+      >
+        <Tab label="Health Summary" />
+        <Tab label="Pod Actions" /> {/* ✅ New Tab */}
+      </Tabs>
+
+      {selectedTab === 0 && (
+        <Box>
+          <HealthSummary />
+        </Box>
+      )}
+
+      {selectedTab === 1 && (
+        <Box>
+          <PodActions /> {/* ✅ Render Pod Actions */}
+        </Box>
+      )}
+    </Box>
   );
 };
 
