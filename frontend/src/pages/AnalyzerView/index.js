@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Box, Tabs, Tab, Typography } from '@mui/material';
-import HealthSummary from '../HealthSummary';
-import PodActions from '../PodActions'; // ✅ Import PodActions
+import HealthSummary from '../AnalyzerView/HealthSummary';
+import PodActions from '../AnalyzerView/PodActions'; // ✅ Import PodActions
 
 const AnalyzerView = () => {
   const [selectedTab, setSelectedTab] = useState(0);
