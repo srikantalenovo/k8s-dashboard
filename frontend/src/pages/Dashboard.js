@@ -33,7 +33,8 @@ import {
 import ResourcesView from '../pages/ResourcesView';
 import AnalyzerView from '../pages/AnalyzerView';
 import Sidebar from "../components/Sidebar";
-import PodActionsView from '../pages/AnalyzerView/PodActionsView'; 
+import PodActionsView from '../pages/PodActionsView';
+
 
 
 // Permission presets
@@ -142,7 +143,8 @@ const Header = ({ currentView, setCurrentView, handleLogout, currentUser }) => {
     { name: 'Home', icon: <HomeIcon />, permission: null },
     { name: 'Analyzer', icon: <AnalyticsIcon />, permission: ['analyzer', 'read'] },
     { name: 'Resources', icon: <ResourcesIcon />, permission: ['nodes', 'read'] },
-    { name: 'Logs', icon: <LogsIcon />, permission: ['logs', 'read'] }
+    { name: 'Logs', icon: <LogsIcon />, permission: ['logs', 'read'] },
+    { name: 'PodActions', icon: <PodIcon />, permission: ['pods', 'read'] }
   ].filter(item => !item.permission || hasPermission(currentUser, ...item.permission));
 
   return (
@@ -373,6 +375,7 @@ const Dashboard = () => {
       case 'Analyzer': return hasPermission(currentUser, 'analyzer', 'read') ? <AnalyzerView /> : <HomeView />;
       case 'Resources': return hasPermission(currentUser, 'nodes', 'read') ? <ResourcesView currentUser={currentUser} /> : <HomeView />;
       case 'Logs': return hasPermission(currentUser, 'logs', 'read') ? <LogsView /> : <HomeView />;
+      case 'PodActions': return hasPermission(currentUser, 'pods', 'read') ? <PodActionsView currentUser={currentUser} /> : <HomeView />;
       default: return <HomeView />;
     }
   };
@@ -413,8 +416,5 @@ const Dashboard = () => {
     );
   };
 
-  <Routes>
-    <Route path="/dashboard/analyzer" element={<AnalyzerView />} />
-    <Route path="/dashboard/analyzer/pod-actions" element={<PodActionsView />} /> {/* Deep link */}
-  </Routes>
+ 
 export default Dashboard;

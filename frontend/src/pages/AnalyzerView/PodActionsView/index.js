@@ -22,7 +22,7 @@ import TerminalIcon from "@mui/icons-material/Terminal";
 import ConstructionIcon from "@mui/icons-material/Construction";
 import AppsIcon from "@mui/icons-material/Apps";
 import RocketLaunchIcon from "@mui/icons-material/RocketLaunch";
-import ResourceTable from "../HealthSummary/ResourceTable";
+import ResourceTable from "../PodActionsView/PodActionTable";
 
 const PodActionsView = () => {
   const [resources, setResources] = useState({});
