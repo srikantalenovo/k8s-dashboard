@@ -2,14 +2,21 @@ FROM node:18-alpine
 
 WORKDIR /app
 
-# Install required tools for kubectl
-RUN apk add --no-cache curl bash
+# Install required tools for kubectl and helm
+RUN apk add --no-cache curl bash tar
 
 # Install kubectl (latest stable)
 RUN curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl" \
     && install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl \
     && rm kubectl
 
+
+# Install Helm (latest)
+RUN curl -fsSL https://get.helm.sh/helm-v3.14.4-linux-amd64.tar.gz -o helm.tar.gz \
+    && tar -zxvf helm.tar.gz \
+    && mv linux-amd64/helm /usr/local/bin/helm \
+    && chmod +x /usr/local/bin/helm \
+    && rm -rf linux-amd64 helm.tar.gz    
 # Copy package files first to leverage Docker cache
 COPY package*.json ./
 
