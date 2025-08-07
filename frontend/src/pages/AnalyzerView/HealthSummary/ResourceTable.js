@@ -23,7 +23,14 @@ const ResourceTable = ({ title, data }) => {
 
   return (
     <Box mt={4}>
-      <Typography variant="h6" gutterBottom>
+      <Typography
+        variant="h6"
+        sx={{
+          fontWeight: "bold",
+          mb: 1,
+          fontFamily: "Roboto, sans-serif",
+        }}
+      >
         {title}
       </Typography>
 
@@ -35,15 +42,41 @@ const ResourceTable = ({ title, data }) => {
         margin="normal"
         value={search}
         onChange={(e) => setSearch(e.target.value)}
+        sx={{ backgroundColor: "#fff", borderRadius: 1 }}
+        InputProps={{
+          sx: {
+            fontFamily: "Roboto, sans-serif",
+          },
+        }}
       />
 
-      <TableContainer component={Paper}>
+      <TableContainer
+        component={Paper}
+        elevation={3}
+        sx={{
+          borderRadius: "12px",
+          boxShadow: "0 4px 12px rgba(0,0,0,0.08)",
+          overflow: "auto",
+        }}
+      >
         <Table>
-          <TableHead sx={{ backgroundColor: "#f5f5f5" }}>
-            <TableRow>
+          <TableHead>
+            <TableRow
+              sx={{
+                background:
+                  "linear-gradient(90deg, #6a11cb 0%, #2575fc 100%)",
+              }}
+            >
               {data.length > 0 &&
                 Object.keys(data[0]).map((key) => (
-                  <TableCell key={key} sx={{ fontWeight: "bold" }}>
+                  <TableCell
+                    key={key}
+                    sx={{
+                      color: "#fff",
+                      fontWeight: "bold",
+                      fontFamily: "Roboto, sans-serif",
+                    }}
+                  >
                     {key}
                   </TableCell>
                 ))}
@@ -51,9 +84,26 @@ const ResourceTable = ({ title, data }) => {
           </TableHead>
           <TableBody>
             {filteredData.map((row, index) => (
-              <TableRow key={index} hover>
+              <TableRow
+                key={index}
+                hover
+                sx={{
+                  transition: "background 0.2s ease",
+                  "&:hover": {
+                    backgroundColor: "#f9f9f9",
+                  },
+                }}
+              >
                 {Object.values(row).map((val, i) => (
-                  <TableCell key={i}>{String(val)}</TableCell>
+                  <TableCell
+                    key={i}
+                    sx={{
+                      fontFamily: "Roboto, sans-serif",
+                      fontSize: "0.95rem",
+                    }}
+                  >
+                    {String(val)}
+                  </TableCell>
                 ))}
               </TableRow>
             ))}

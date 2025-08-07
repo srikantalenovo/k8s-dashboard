@@ -73,7 +73,7 @@ const hasPermission = (user, resource, action) => {
 
 const GradientBox = styled(Box)(({ theme }) => ({
   minHeight: '100vh',
-  background: 'linear-gradient(135deg, #fafefdff 0%, #90f2dbff 100%)',  //theme change
+  background: 'linear-gradient(135deg, #025e6cff 0%, #06d4abff 100%)',  //theme change
   padding: theme.spacing(2),
   [theme.breakpoints.up('md')]: {
     padding: theme.spacing(3)
@@ -151,7 +151,7 @@ const Header = ({ currentView, setCurrentView, handleLogout, currentUser }) => {
       justifyContent: 'space-between',
       alignItems: { xs: 'flex-start', sm: 'center' },
       padding: theme.spacing(2),
-      backgroundColor: 'rgba(255, 255, 255, 0.1)',
+      backgroundColor: 'rgba(35, 18, 18, 0.1)',
       backdropFilter: 'blur(10px)',
       borderRadius: '12px',
       marginBottom: theme.spacing(3),
@@ -159,7 +159,7 @@ const Header = ({ currentView, setCurrentView, handleLogout, currentUser }) => {
     }}>
       {/* Logo */}
       <Box sx={{ display: 'flex', alignItems: 'center' }}>
-        <DashboardIcon sx={{ fontSize: 36, color: 'white', mr: 1 }} />
+        <DashboardIcon sx={{ fontSize: 36, color: 'orange', mr: 1 }} />
         <Typography variant="h6" sx={{ color: 'white', fontWeight: 'bold' }}>
           GrepMind
         </Typography>

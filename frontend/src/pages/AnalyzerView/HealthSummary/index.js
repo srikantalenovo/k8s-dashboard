@@ -51,7 +51,7 @@ const HealthSummary = () => {
     return (
       <Box textAlign="center" mt={4}>
         <CircularProgress />
-        <Typography variant="body2" mt={2}>
+        <Typography variant="body2" mt={2} sx={{ color: 'white', fontWeight: 'bold' }}>
           Loading cluster health data...
         </Typography>
       </Box>
@@ -61,11 +61,11 @@ const HealthSummary = () => {
   return (
     <Box p={3}>
       <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
-        <Typography variant="h5" fontWeight={600}>
+        <Typography variant="h5" fontWeight={600} sx={{ color: 'white', fontWeight: 'bold' }}>
           Cluster Health Summary
         </Typography>
         <Box display="flex" alignItems="center" gap={1}>
-          <Typography variant="body2" color="textSecondary">
+          <Typography variant="body2" color="textSecondary" sx={{ color: 'white', fontWeight: 'bold' }}>
             Last updated: {formatTime(lastUpdated)}
           </Typography>
           <IconButton onClick={fetchData} color="primary">
