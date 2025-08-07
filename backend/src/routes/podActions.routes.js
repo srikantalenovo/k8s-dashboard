@@ -7,8 +7,8 @@ import {
   deleteDeployment,
   restartDeployment,
   scaleDeployment,
-  listHelmReleases,
-  uninstallHelmRelease
+  getHelmReleases,
+  uninstallHelmRelease,
 } from '../controllers/podActions.controller.js';
 
 const router = express.Router();
@@ -21,7 +21,7 @@ router.post('/deployment/delete', deleteDeployment);
 router.post('/deployment/restart', restartDeployment);
 router.post('/deployment/scale', scaleDeployment);
 
-router.get('/helm/list', listHelmReleases);
-router.post('/helm/uninstall', uninstallHelmRelease);
+router.get('/helm/releases', getHelmReleases);
+router.delete('/helm/uninstall/:namespace/:release', uninstallHelmRelease);
 
 export default router;

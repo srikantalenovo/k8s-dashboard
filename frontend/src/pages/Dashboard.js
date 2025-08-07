@@ -1,6 +1,6 @@
 import api from '../services/api';
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Routes, Route } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import {
   Box, Typography, Select, MenuItem, Table, TableBody, Tooltip, FormControl, InputLabel, Alert,
@@ -33,6 +33,7 @@ import {
 import ResourcesView from '../pages/ResourcesView';
 import AnalyzerView from '../pages/AnalyzerView';
 import Sidebar from "../components/Sidebar";
+import PodActionsView from '../pages/AnalyzerView/PodActionsView'; 
 
 
 // Permission presets
@@ -412,4 +413,8 @@ const Dashboard = () => {
     );
   };
 
+  <Routes>
+    <Route path="/dashboard/analyzer" element={<AnalyzerView />} />
+    <Route path="/dashboard/analyzer/pod-actions" element={<PodActionsView />} /> {/* Deep link */}
+  </Routes>
 export default Dashboard;

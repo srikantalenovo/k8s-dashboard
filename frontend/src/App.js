@@ -5,7 +5,7 @@ import Login from './pages/Login';
 import Signup from './pages/Signup';
 import Resources from './pages/Resources';
 import AnalyzerView from './pages/AnalyzerView';
-import PodActions from './pages/AnalyzerView/PodActions';
+import PodActionsView from './pages/AnalyzerView/PodActionsView';
 
 
 function App() {
@@ -19,7 +19,7 @@ function App() {
       <Route path="/dashboard" element={token ? <Dashboard /> : <Navigate to="/login" replace />} />
       <Route path="/resources" element={token ? <Resources /> : <Navigate to="/resources" replace />} />
       <Route path="/analyzer" element={token ? <AnalyzerView /> : <Navigate to="/analyzer" replace />} />
-      <Route path="/podactions" element={token ? <PodActions /> : <Navigate to="/podactions" replace />} />
+      <Route path="/podactions" element={token ? <PodActionsView /> : <Navigate to="/podactions" replace />} />
     </Routes>
   );
 }

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import {
-  Drawer, List, ListItem, ListItemIcon, ListItemText,
+  Drawer, List, ListItem, ListItemIcon, ListItemText, ListItemButton, Link,
   IconButton, Box, Typography, Divider, Avatar, Tooltip, useTheme
 } from '@mui/material';
 import {
@@ -10,7 +10,8 @@ import {
   Folder as ResourcesIcon,
   List as LogsIcon,
   Brightness4 as DarkModeIcon,
-  Brightness7 as LightModeIcon
+  Brightness7 as LightModeIcon,
+  Dns as PodIcon
 } from '@mui/icons-material';
 
 const drawerWidth = 240;
@@ -83,6 +84,11 @@ const Sidebar = ({ currentView, setCurrentView, currentUser }) => {
             </ListItem>
           ))}
         </List>
+
+          <ListItemButton component={Link} to="/dashboard/analyzer/pod-actions">
+            <ListItemIcon><PodIcon /></ListItemIcon>
+            <ListItemText primary="Pod Actions" />
+          </ListItemButton>
 
         <Box sx={{ flexGrow: 1 }} />
 

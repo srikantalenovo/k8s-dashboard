@@ -1,38 +1,26 @@
+// AnalyzerView/index.js
+
 import React, { useState } from 'react';
-import { Box, Tabs, Tab, Typography } from '@mui/material';
-import HealthSummary from '../AnalyzerView/HealthSummary';
-import PodActions from '../AnalyzerView/PodActions'; // ✅ Import PodActions
+import { Tabs, Tab, Box } from '@mui/material';
+import HealthSummary from './HealthSummary';
+import PodActionsView from '../PodActionsView';
 
 const AnalyzerView = () => {
-  const [selectedTab, setSelectedTab] = useState(0);
+  const [tabIndex, setTabIndex] = useState(0);
 
   const handleTabChange = (event, newValue) => {
-    setSelectedTab(newValue);
+    setTabIndex(newValue);
   };
 
   return (
     <Box sx={{ width: '100%' }}>
-      <Tabs
-        value={selectedTab}
-        onChange={handleTabChange}
-        aria-label="Analyzer Tabs"
-        sx={{ mb: 3 }}
-      >
+      <Tabs value={tabIndex} onChange={handleTabChange}>
         <Tab label="Health Summary" />
-        <Tab label="Pod Actions" /> {/* ✅ New Tab */}
+        <Tab label="Pod Actions" />
       </Tabs>
 
-      {selectedTab === 0 && (
-        <Box>
-          <HealthSummary />
-        </Box>
-      )}
-
-      {selectedTab === 1 && (
-        <Box>
-          <PodActions /> {/* ✅ Render Pod Actions */}
-        </Box>
-      )}
+      {tabIndex === 0 && <HealthSummary />}
+      {tabIndex === 1 && <PodActionsView />}
     </Box>
   );
 };

@@ -10,6 +10,7 @@ kc.loadFromDefault();
 const k8sApi = kc.makeApiClient(k8s.CoreV1Api);
 const appsApi = kc.makeApiClient(k8s.AppsV1Api);
 
+// --- POD ACTIONS ---
 export const deletePod = async (req, res) => {
   const { namespace, podName } = req.body;
   try {
@@ -42,6 +43,7 @@ export const getPodLogs = async (req, res) => {
   }
 };
 
+// --- DEPLOYMENT ACTIONS ---
 export const deleteDeployment = async (req, res) => {
   const { namespace, deploymentName } = req.body;
   try {
@@ -59,8 +61,8 @@ export const restartDeployment = async (req, res) => {
       {
         op: 'add',
         path: '/spec/template/metadata/annotations/restartedAt',
-        value: new Date().toISOString()
-      }
+        value: new Date().toISOString(),
+      },
     ];
 
     await appsApi.patchNamespacedDeployment(
@@ -72,7 +74,7 @@ export const restartDeployment = async (req, res) => {
       undefined,
       undefined,
       {
-        headers: { 'Content-Type': 'application/json-patch+json' }
+        headers: { 'Content-Type': 'application/json-patch+json' },
       }
     );
 
@@ -86,7 +88,7 @@ export const scaleDeployment = async (req, res) => {
   const { namespace, deploymentName, replicas } = req.body;
   try {
     const scale = {
-      spec: { replicas }
+      spec: { replicas },
     };
 
     await appsApi.patchNamespacedDeploymentScale(
@@ -98,7 +100,7 @@ export const scaleDeployment = async (req, res) => {
       undefined,
       undefined,
       {
-        headers: { 'Content-Type': 'application/merge-patch+json' }
+        headers: { 'Content-Type': 'application/merge-patch+json' },
       }
     );
 
@@ -108,20 +110,30 @@ export const scaleDeployment = async (req, res) => {
   }
 };
 
-export const listHelmReleases = async (req, res) => {
+// --- HELM ACTIONS ---
+export const getHelmReleases = async (req, res) => {
+  const { namespace } = req.query;
+
   try {
-    const { stdout } = await execAsync('helm list -A -o json');
-    res.json(JSON.parse(stdout));
+    const command = namespace
+      ? `helm list -n ${namespace} --output json`
+      : `helm list --all-namespaces --output json`;
+
+    const { stdout } = await execAsync(command);
+    const releases = JSON.parse(stdout);
+
+    res.json(releases);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 };
 
 export const uninstallHelmRelease = async (req, res) => {
-  const { releaseName, namespace } = req.body;
+  const { release, namespace } = req.params;
+
   try {
-    await execAsync(`helm uninstall ${releaseName} -n ${namespace}`);
-    res.json({ message: `Helm release ${releaseName} uninstalled.` });
+    await execAsync(`helm uninstall ${release} -n ${namespace}`);
+    res.json({ message: `Helm release ${release} uninstalled.` });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
