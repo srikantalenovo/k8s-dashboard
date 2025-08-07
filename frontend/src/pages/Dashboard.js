@@ -73,7 +73,7 @@ const hasPermission = (user, resource, action) => {
 
 const GradientBox = styled(Box)(({ theme }) => ({
   minHeight: '100vh',
-  background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+  background: 'linear-gradient(135deg, #0bdda5ff 0%, #f2eef5ff 100%)',
   padding: theme.spacing(2),
   [theme.breakpoints.up('md')]: {
     padding: theme.spacing(3)
