@@ -2,8 +2,8 @@
 
 import React, { useState } from 'react';
 import { Tabs, Tab, Box } from '@mui/material';
-import HealthSummary from './HealthSummary';
-import PodActionsView from '../PodActionsView';
+import HealthSummary from '../AnalyzerView/HealthSummary';
+import PodActionsView from '../AnalyzerView/PodActionsView';
 
 const AnalyzerView = () => {
   const [tabIndex, setTabIndex] = useState(0);
