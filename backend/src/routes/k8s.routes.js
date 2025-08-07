@@ -236,7 +236,6 @@ router.get('/analyzer/health-summary', async (req, res) => {
   }
 });
 
-import podActionsRoutes from './podActions.routes.js';
-app.use('/api/k8s/pod-actions', podActionsRoutes); // ✅ Include this line
+
 
 export default router;

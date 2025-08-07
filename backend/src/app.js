@@ -7,6 +7,7 @@ import dotenv from 'dotenv';
 import authRoutes from './routes/auth.routes.js';
 import adminRoutes from './routes/admin.routes.js';
 import k8sRoutes from './routes/k8s.routes.js';
+import podActionsRoutes from './routes/podActions.routes.js';
 
 dotenv.config();
 
@@ -21,5 +22,6 @@ app.use(express.json());
 app.use('/api/auth', authRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/k8s', k8sRoutes);
+app.use('/api/k8s/pod-actions', podActionsRoutes);
 
 export default app;
