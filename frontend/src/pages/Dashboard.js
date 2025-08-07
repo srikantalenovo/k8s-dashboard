@@ -33,7 +33,7 @@ import {
 import ResourcesView from '../pages/ResourcesView';
 import AnalyzerView from '../pages/AnalyzerView';
 import Sidebar from "../components/Sidebar";
-import PodActionsView from '../pages/PodActionsView';
+import PodActionsView from '../pages/AnalyzerView/PodActionsView';
 
 
 
