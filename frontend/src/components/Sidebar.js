@@ -1,68 +1,112 @@
-// src/components/Sidebar.js
-import React from "react";
-import { Drawer, List, ListItem, ListItemIcon, ListItemText, Toolbar } from "@mui/material";
-import DashboardIcon from "@mui/icons-material/Dashboard";
-import StorageIcon from "@mui/icons-material/Storage";
-import AnalyticsIcon from "@mui/icons-material/Analytics";
-import DescriptionIcon from "@mui/icons-material/Description";
-import { useNavigate } from "react-router-dom";
+import React, { useState } from 'react';
+import {
+  Drawer, List, ListItem, ListItemIcon, ListItemText,
+  IconButton, Box, Typography, Divider, Avatar, Tooltip, useTheme
+} from '@mui/material';
+import {
+  Menu as MenuIcon,
+  Home as HomeIcon,
+  Analytics as AnalyticsIcon,
+  Folder as ResourcesIcon,
+  List as LogsIcon,
+  Brightness4 as DarkModeIcon,
+  Brightness7 as LightModeIcon
+} from '@mui/icons-material';
 
 const drawerWidth = 240;
 
-const Sidebar = ({ user }) => {
-  const navigate = useNavigate();
+const navItems = [
+  { label: 'Home', icon: <HomeIcon />, key: 'Home' },
+  { label: 'Analyzer', icon: <AnalyticsIcon />, key: 'Analyzer' },
+  { label: 'Resources', icon: <ResourcesIcon />, key: 'Resources' },
+  { label: 'Logs', icon: <LogsIcon />, key: 'Logs' }
+];
 
-  const menuItems = [
-    {
-      text: "Home",
-      icon: <DashboardIcon />,
-      route: "/dashboard",
-      permission: "dashboard:view",
-    },
-    {
-      text: "Resources",
-      icon: <StorageIcon />,
-      route: "/dashboard/resources",
-      permission: "resources:view",
-    },
-    {
-      text: "Analyzer",
-      icon: <AnalyticsIcon />,
-      route: "/dashboard/analyzer",
-      permission: "analyzer:view",
-    },
-    {
-      text: "Logs",
-      icon: <DescriptionIcon />,
-      route: "/dashboard/logs",
-      permission: "logs:view",
-    },
-  ];
+const Sidebar = ({ currentView, setCurrentView, currentUser }) => {
+  const [collapsed, setCollapsed] = useState(false);
+  const theme = useTheme();
 
-  const hasPermission = (perm) => {
-    return user?.permissions?.includes(perm);
-  };
+  const toggleCollapse = () => setCollapsed(!collapsed);
 
   return (
     <Drawer
       variant="permanent"
       sx={{
-        width: drawerWidth,
+        width: collapsed ? 72 : drawerWidth,
         flexShrink: 0,
-        [`& .MuiDrawer-paper`]: { width: drawerWidth, boxSizing: "border-box" },
+        '& .MuiDrawer-paper': {
+          width: collapsed ? 72 : drawerWidth,
+          boxSizing: 'border-box',
+          backgroundColor: '#1e1e2f',
+          color: '#ffffff',
+          transition: 'width 0.3s'
+        }
       }}
     >
-      <Toolbar />
-      <List>
-        {menuItems.map((item) =>
-          hasPermission(item.permission) ? (
-            <ListItem button key={item.text} onClick={() => navigate(item.route)}>
-              <ListItemIcon>{item.icon}</ListItemIcon>
-              <ListItemText primary={item.text} />
+      <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+        {/* Logo and Collapse Button */}
+        <Box sx={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: collapsed ? 'center' : 'space-between',
+          px: 2,
+          py: 2
+        }}>
+          {!collapsed && <Typography variant="h6" sx={{ fontWeight: 'bold' }}>GrepMind</Typography>}
+          <IconButton onClick={toggleCollapse} sx={{ color: '#ffffff' }}>
+            <MenuIcon />
+          </IconButton>
+        </Box>
+
+        <Divider sx={{ backgroundColor: '#555' }} />
+
+        {/* Navigation Links */}
+        <List>
+          {navItems.map((item) => (
+            <ListItem
+              button
+              key={item.key}
+              selected={currentView === item.key}
+              onClick={() => setCurrentView(item.key)}
+              sx={{
+                color: currentView === item.key ? '#00e5ff' : '#ffffff',
+                backgroundColor: currentView === item.key ? '#2b2b3c' : 'transparent',
+                '&:hover': {
+                  backgroundColor: '#333',
+                },
+              }}
+            >
+              <ListItemIcon sx={{ color: 'inherit', minWidth: collapsed ? 0 : 40 }}>
+                {item.icon}
+              </ListItemIcon>
+              {!collapsed && <ListItemText primary={item.label} />}
             </ListItem>
-          ) : null
-        )}
-      </List>
+          ))}
+        </List>
+
+        <Box sx={{ flexGrow: 1 }} />
+
+        {/* Bottom User Section */}
+        <Box sx={{ px: 2, pb: 2 }}>
+          {!collapsed ? (
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <Avatar sx={{ bgcolor: '#00bcd4' }}>
+                {currentUser?.username?.[0]?.toUpperCase()}
+              </Avatar>
+              <Box>
+                <Typography variant="body2">{currentUser?.username}</Typography>
+                <Typography variant="caption" color="gray">{currentUser?.role}</Typography>
+              </Box>
+            </Box>
+          ) : (
+            <Tooltip title={currentUser?.username}>
+              <Avatar sx={{ bgcolor: '#00bcd4' }}>
+                {currentUser?.username?.[0]?.toUpperCase()}
+              </Avatar>
+            </Tooltip>
+          )}
+        </Box>
+      </Box>
     </Drawer>
   );
 };

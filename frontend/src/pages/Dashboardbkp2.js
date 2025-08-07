@@ -30,8 +30,8 @@ import {
   Visibility as VisibilityIcon
 } from '@mui/icons-material';
 
-import ResourcesView from '../pages/ResourcesView';
-import AnalyzerView from '../pages/AnalyzerView';
+import ResourcesView from './ResourcesView';
+import AnalyzerView from './AnalyzerView';
 import Sidebar from "../components/Sidebar";
 
 
@@ -376,40 +376,19 @@ const Dashboard = () => {
     }
   };
 
-//   return (
-//     <GradientBox>
-//       <Container maxWidth="xl">
-//         <Header
-//           currentView={currentView}
-//           setCurrentView={setCurrentView}
-//           handleLogout={handleLogout}
-//           currentUser={currentUser}
-//         />
-//         {renderView()}
-//       </Container>
-//     </GradientBox>
-//   );
-// };
-    return (
-      <Box sx={{ display: 'flex' }}>
-        {/* Sidebar */}
-        <Sidebar currentView={currentView} setCurrentView={setCurrentView} currentUser={currentUser} />
-
-        {/* Main content */}
-        <GradientBox sx={{ flexGrow: 1 }}>
-          <Container maxWidth="xl">
-            {/* User Controls Header */}
-            <Header
-              currentView={currentView}
-              setCurrentView={setCurrentView}
-              handleLogout={handleLogout}
-              currentUser={currentUser}
-            />
-            {renderView()}
-          </Container>
-        </GradientBox>
-      </Box>
-    );
-  };
+  return (
+    <GradientBox>
+      <Container maxWidth="xl">
+        <Header
+          currentView={currentView}
+          setCurrentView={setCurrentView}
+          handleLogout={handleLogout}
+          currentUser={currentUser}
+        />
+        {renderView()}
+      </Container>
+    </GradientBox>
+  );
+};
 
 export default Dashboard;

@@ -23,7 +23,7 @@ import { styled } from '@mui/material/styles';
 
 const AuthContainer = styled(Box)(({ theme }) => ({
   minHeight: '100vh',
-  background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+  background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',   //theme change
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'center',
