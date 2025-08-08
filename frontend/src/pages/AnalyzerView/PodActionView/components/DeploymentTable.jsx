@@ -3,12 +3,10 @@ import {
   DataGrid,
   GridToolbar,
   GridActionsCellItem,
-  GridRowModes,
 } from '@mui/x-data-grid';
 import {
   Box,
   Chip,
-  IconButton,
   LinearProgress,
   Tooltip,
   TextField,
@@ -23,61 +21,67 @@ import {
   Refresh,
   Delete,
   Scale,
-  WarningAmber,
 } from '@mui/icons-material';
-import { tokens } from '../../../../theme';
 
 const DeploymentTable = ({ deployments, namespace }) => {
   const theme = useTheme();
-  const colors = tokens(theme.palette.mode);
   const [scaleDialogOpen, setScaleDialogOpen] = useState(false);
   const [selectedDeployment, setSelectedDeployment] = useState(null);
   const [replicas, setReplicas] = useState(0);
 
   const handleScale = async () => {
     try {
-      await fetch(`/api/k8s/deployments/${selectedDeployment}/scale`, {
-        method: 'PATCH',
-        headers: { 
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          namespace,
-          replicas: parseInt(replicas)
-        })
-      });
+      const res = await fetch(
+        `/api/k8s/deployments/${selectedDeployment}/scale?namespace=${namespace}`,
+        {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${localStorage.getItem('token')}`
+          },
+          body: JSON.stringify({ replicas: parseInt(replicas) })
+        }
+      );
+      if (!res.ok) throw new Error(await res.text());
       setScaleDialogOpen(false);
     } catch (error) {
       console.error('Scale failed:', error);
     }
   };
 
-  const handleDelete = async (deploymentName) => {
+  const handleRestart = async (deploymentName) => {
     try {
-      await fetch(`/api/k8s/deployments/${deploymentName}?namespace=${namespace}`, {
-        method: 'DELETE',
-        headers: { 
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
-          'Content-Type': 'application/json'
+      const res = await fetch(
+        `/api/k8s/deployments/${deploymentName}/restart?namespace=${namespace}`,
+        {
+          method: 'POST',
+          headers: { 
+            'Authorization': `Bearer ${localStorage.getItem('token')}`,
+            'Content-Type': 'application/json'
+          }
         }
-      });
+      );
+      if (!res.ok) throw new Error(await res.text());
     } catch (error) {
-      console.error('Delete failed:', error);
+      console.error('Restart failed:', error);
     }
   };
 
-  const handleRestart = async (deploymentName) => {
+  const handleDelete = async (deploymentName) => {
     try {
-      await fetch(`/api/k8s/deployments/${deploymentName}/restart?namespace=${namespace}`, {
-        method: 'POST',
-        headers: { 
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
-          'Content-Type': 'application/json'
+      const res = await fetch(
+        `/api/k8s/deployments/${deploymentName}?namespace=${namespace}`,
+        {
+          method: 'DELETE',
+          headers: { 
+            'Authorization': `Bearer ${localStorage.getItem('token')}`,
+            'Content-Type': 'application/json'
+          }
         }
-      });
+      );
+      if (!res.ok) throw new Error(await res.text());
     } catch (error) {
-      console.error('Restart failed:', error);
+      console.error('Delete failed:', error);
     }
   };
 
@@ -144,7 +148,7 @@ const DeploymentTable = ({ deployments, namespace }) => {
     <Box sx={{ 
       height: '75vh',
       width: '100%',
-      backgroundColor: colors.primary[400],
+      backgroundColor: theme.palette.background.default,
       borderRadius: '4px',
       overflow: 'hidden'
     }}>
@@ -158,18 +162,18 @@ const DeploymentTable = ({ deployments, namespace }) => {
         }}
         sx={{
           '& .MuiDataGrid-cell': {
-            borderBottom: `1px solid ${colors.grey[700]} !important`,
+            borderBottom: `1px solid ${theme.palette.divider}`,
           },
           '& .MuiDataGrid-columnHeaders': {
-            backgroundColor: colors.blueAccent[700],
-            borderBottom: `1px solid ${colors.grey[800]}`,
+            backgroundColor: theme.palette.mode === 'dark' ? '#1e1e1e' : '#f5f5f5',
+            borderBottom: `1px solid ${theme.palette.divider}`,
           },
           '& .MuiDataGrid-virtualScroller': {
-            backgroundColor: colors.primary[400],
+            backgroundColor: theme.palette.background.paper,
           },
           '& .MuiDataGrid-footerContainer': {
-            borderTop: `1px solid ${colors.grey[800]}`,
-            backgroundColor: colors.blueAccent[700],
+            borderTop: `1px solid ${theme.palette.divider}`,
+            backgroundColor: theme.palette.mode === 'dark' ? '#1e1e1e' : '#f5f5f5',
           },
         }}
       />

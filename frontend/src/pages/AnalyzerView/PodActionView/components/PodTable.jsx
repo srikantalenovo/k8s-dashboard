@@ -3,13 +3,10 @@ import {
   DataGrid,
   GridToolbar,
   GridActionsCellItem,
-  GridRowModes,
-  useGridApiRef,
 } from '@mui/x-data-grid';
 import {
   Box,
   Chip,
-  IconButton,
   LinearProgress,
   Tooltip,
   useTheme,
@@ -19,29 +16,26 @@ import {
   Refresh,
   Article,
   WarningAmber,
-  Visibility,
 } from '@mui/icons-material';
 import LogsModal from './LogsModal';
 import ActionToolbar from './ActionToolbar';
-import { tokens } from '../../../../theme';
 
 const PodTable = ({ pods, namespace, onNamespaceChange, onReload }) => {
   const theme = useTheme();
-  const colors = tokens(theme.palette.mode);
-  const apiRef = useGridApiRef();
   const [logsModalOpen, setLogsModalOpen] = useState(false);
   const [selectedPod, setSelectedPod] = useState(null);
 
   const handleDelete = async (podName) => {
     try {
-      await fetch(`/api/k8s/pods/${podName}?namespace=${namespace}`, {
+      const res = await fetch(`/api/k8s/pods/${podName}?namespace=${namespace}`, {
         method: 'DELETE',
         headers: { 
           'Authorization': `Bearer ${localStorage.getItem('token')}`,
           'Content-Type': 'application/json'
         }
       });
-      onReload();
+      if (!res.ok) throw new Error(await res.text());
+      onReload(); // Refresh pod list
     } catch (error) {
       console.error('Delete failed:', error);
     }
@@ -49,14 +43,15 @@ const PodTable = ({ pods, namespace, onNamespaceChange, onReload }) => {
 
   const handleRestart = async (podName) => {
     try {
-      await fetch(`/api/k8s/pods/${podName}/restart?namespace=${namespace}`, {
+      const res = await fetch(`/api/k8s/pods/${podName}/restart?namespace=${namespace}`, {
         method: 'POST',
         headers: { 
           'Authorization': `Bearer ${localStorage.getItem('token')}`,
           'Content-Type': 'application/json'
         }
       });
-      onReload();
+      if (!res.ok) throw new Error(await res.text());
+      onReload(); // Refresh pod list
     } catch (error) {
       console.error('Restart failed:', error);
     }
@@ -89,10 +84,7 @@ const PodTable = ({ pods, namespace, onNamespaceChange, onReload }) => {
             params.value === 'Failed' ? 'error' : 'warning'
           }
           variant="outlined"
-          sx={{ 
-            width: 80,
-            fontWeight: 600 
-          }}
+          sx={{ width: 80, fontWeight: 600 }}
         />
       )
     },
@@ -101,11 +93,6 @@ const PodTable = ({ pods, namespace, onNamespaceChange, onReload }) => {
       headerName: 'Restarts',
       width: 100,
       type: 'number'
-    },
-    {
-      field: 'nodeName',
-      headerName: 'Node',
-      flex: 1
     },
     {
       field: 'actions',
@@ -132,7 +119,6 @@ const PodTable = ({ pods, namespace, onNamespaceChange, onReload }) => {
           onClick={() => handleDelete(params.row.name)}
           label="Delete"
           showInMenu
-          disabled={!params.row.deletable}
         />,
       ],
     },
@@ -142,7 +128,7 @@ const PodTable = ({ pods, namespace, onNamespaceChange, onReload }) => {
     <Box sx={{ 
       height: '75vh',
       width: '100%',
-      backgroundColor: colors.primary[400],
+      backgroundColor: theme.palette.background.default,
       borderRadius: '4px',
       overflow: 'hidden'
     }}>
@@ -150,11 +136,9 @@ const PodTable = ({ pods, namespace, onNamespaceChange, onReload }) => {
         namespace={namespace}
         onNamespaceChange={onNamespaceChange}
         onReload={onReload}
-        resourceType="pods"
       />
       
       <DataGrid
-        apiRef={apiRef}
         rows={pods}
         columns={columns}
         loading={!pods.length}
@@ -162,26 +146,20 @@ const PodTable = ({ pods, namespace, onNamespaceChange, onReload }) => {
           toolbar: GridToolbar,
           loadingOverlay: LinearProgress,
         }}
-        slotProps={{
-          toolbar: {
-            showQuickFilter: true,
-            quickFilterProps: { debounceMs: 500 },
-          },
-        }}
         sx={{
           '& .MuiDataGrid-cell': {
-            borderBottom: `1px solid ${colors.grey[700]} !important`,
+            borderBottom: `1px solid ${theme.palette.divider}`,
           },
           '& .MuiDataGrid-columnHeaders': {
-            backgroundColor: colors.blueAccent[700],
-            borderBottom: `1px solid ${colors.grey[800]}`,
+            backgroundColor: theme.palette.mode === 'dark' ? '#1e1e1e' : '#f5f5f5',
+            borderBottom: `1px solid ${theme.palette.divider}`,
           },
           '& .MuiDataGrid-virtualScroller': {
-            backgroundColor: colors.primary[400],
+            backgroundColor: theme.palette.background.paper,
           },
           '& .MuiDataGrid-footerContainer': {
-            borderTop: `1px solid ${colors.grey[800]}`,
-            backgroundColor: colors.blueAccent[700],
+            borderTop: `1px solid ${theme.palette.divider}`,
+            backgroundColor: theme.palette.mode === 'dark' ? '#1e1e1e' : '#f5f5f5',
           },
         }}
       />

@@ -17,11 +17,9 @@ import {
   History,
   WarningAmber,
 } from '@mui/icons-material';
-import { tokens } from '../../../../theme';
 
 const HelmTable = ({ releases, namespace }) => {
   const theme = useTheme();
-  const colors = tokens(theme.palette.mode);
 
   const handleUninstall = async (releaseName) => {
     try {
@@ -95,7 +93,7 @@ const HelmTable = ({ releases, namespace }) => {
     <Box sx={{ 
       height: '75vh',
       width: '100%',
-      backgroundColor: colors.primary[400],
+      backgroundColor: theme.palette.background.default,
       borderRadius: '4px',
       overflow: 'hidden'
     }}>
@@ -109,18 +107,18 @@ const HelmTable = ({ releases, namespace }) => {
         }}
         sx={{
           '& .MuiDataGrid-cell': {
-            borderBottom: `1px solid ${colors.grey[700]} !important`,
+            borderBottom: `1px solid ${theme.palette.divider}`,
           },
           '& .MuiDataGrid-columnHeaders': {
-            backgroundColor: colors.blueAccent[700],
-            borderBottom: `1px solid ${colors.grey[800]}`,
+            backgroundColor: theme.palette.mode === 'dark' ? '#1e1e1e' : '#f5f5f5',
+            borderBottom: `1px solid ${theme.palette.divider}`,
           },
           '& .MuiDataGrid-virtualScroller': {
-            backgroundColor: colors.primary[400],
+            backgroundColor: theme.palette.background.paper,
           },
           '& .MuiDataGrid-footerContainer': {
-            borderTop: `1px solid ${colors.grey[800]}`,
-            backgroundColor: colors.blueAccent[700],
+            borderTop: `1px solid ${theme.palette.divider}`,
+            backgroundColor: theme.palette.mode === 'dark' ? '#1e1e1e' : '#f5f5f5',
           },
         }}
       />

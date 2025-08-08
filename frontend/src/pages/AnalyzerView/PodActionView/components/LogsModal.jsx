@@ -15,11 +15,9 @@ import {
   Pause,
   PlayArrow,
 } from '@mui/icons-material';
-import { tokens } from '../../../../theme';
 
 const LogsModal = ({ open, onClose, pod, namespace }) => {
   const theme = useTheme();
-  const colors = tokens(theme.palette.mode);
   const [logs, setLogs] = useState('');
   const [isPaused, setIsPaused] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -71,7 +69,7 @@ const LogsModal = ({ open, onClose, pod, namespace }) => {
     transform: 'translate(-50%, -50%)',
     width: '80vw',
     height: '80vh',
-    bgcolor: colors.primary[400],
+    bgcolor: theme.palette.background.paper,
     boxShadow: 24,
     borderRadius: '4px',
     overflow: 'hidden',
@@ -80,21 +78,17 @@ const LogsModal = ({ open, onClose, pod, namespace }) => {
   };
 
   return (
-    <Modal
-      open={open}
-      onClose={onClose}
-      aria-labelledby="logs-modal-title"
-    >
+    <Modal open={open} onClose={onClose}>
       <Box sx={style}>
         <Box sx={{
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
           p: 2,
-          borderBottom: `1px solid ${colors.grey[700]}`,
-          backgroundColor: colors.blueAccent[700],
+          borderBottom: `1px solid ${theme.palette.divider}`,
+          backgroundColor: theme.palette.mode === 'dark' ? '#1e1e1e' : '#f5f5f5',
         }}>
-          <Typography variant="h6" id="logs-modal-title">
+          <Typography variant="h6">
             Logs: {pod?.name || 'Loading...'}
           </Typography>
           <Box>
@@ -120,10 +114,10 @@ const LogsModal = ({ open, onClose, pod, namespace }) => {
           flex: 1,
           p: 2,
           overflow: 'auto',
-          backgroundColor: colors.primary[400],
+          backgroundColor: theme.palette.background.default,
           fontFamily: 'monospace',
           whiteSpace: 'pre-wrap',
-          color: theme.palette.mode === 'dark' ? '#fff' : '#000',
+          color: theme.palette.text.primary,
         }}>
           {error ? (
             <Typography color="error">{error}</Typography>

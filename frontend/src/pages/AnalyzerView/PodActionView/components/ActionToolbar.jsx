@@ -15,7 +15,6 @@ import {
   Add,
   FilterAlt,
 } from '@mui/icons-material';
-import { tokens } from '../../../../theme';
 
 const ActionToolbar = ({ 
   namespace, 
@@ -25,7 +24,6 @@ const ActionToolbar = ({
   namespaces = [],
 }) => {
   const theme = useTheme();
-  const colors = tokens(theme.palette.mode);
 
   return (
     <Box sx={{
@@ -33,8 +31,8 @@ const ActionToolbar = ({
       alignItems: 'center',
       justifyContent: 'space-between',
       p: 1,
-      backgroundColor: colors.primary[400],
-      borderBottom: `1px solid ${colors.grey[700]}`,
+      backgroundColor: theme.palette.mode === 'dark' ? '#1e1e1e' : '#f5f5f5',
+      borderBottom: `1px solid ${theme.palette.divider}`,
     }}>
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
         <FormControl size="small" sx={{ minWidth: 180 }}>
@@ -67,7 +65,7 @@ const ActionToolbar = ({
           sx={{ 
             width: 250,
             '& .MuiOutlinedInput-root': {
-              backgroundColor: colors.primary[600],
+              backgroundColor: theme.palette.background.paper,
             },
           }}
         />

@@ -2,11 +2,16 @@
 import { createTheme } from '@mui/material/styles';
 
 export const tokens = (mode) => ({
-  // Your color tokens here
+  grey: {
+    700: "#e0e0e0", // Make sure these values exist
+    800: "#bdbdbd"
+  },
   primary: {
-    100: "#d0d1d5",
-    200: "#a1a4ab",
-    // ...
+    400: "#f0f0f0",
+    600: "#d0d0d0"
+  },
+  blueAccent: {
+    700: "#1976d2"
   }
 });
 
