@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import { Tabs, Tab, Box } from '@mui/material';
 import HealthSummary from '../AnalyzerView/HealthSummary';
-import PodActionView from '../AnalyzerView/PodActionView';
+import PodActionView from '../AnalyzerView/PodActionView/PodActionView';
 
 const AnalyzerView = () => {
   const [tabIndex, setTabIndex] = useState(0);
