@@ -1,56 +1,49 @@
-import { useState, useEffect } from 'react';
-import { useWebSocket } from 'react-use-websocket';
+import { useState, useEffect, useRef } from 'react';
 
 export default function useDeployments(namespace = 'default') {
   const [deployments, setDeployments] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
+  const pollingInterval = useRef(null);
+  const [lastUpdated, setLastUpdated] = useState(null);
 
   const fetchDeployments = async () => {
     try {
-      setIsLoading(true);
       const res = await fetch(`/api/k8s/deployments?namespace=${namespace}`);
       if (!res.ok) throw new Error(await res.text());
-      setDeployments(await res.json());
+      const data = await res.json();
+      setDeployments(data);
+      setLastUpdated(new Date());
+      setError(null);
     } catch (err) {
       setError(err.message);
+      stopPolling();
     } finally {
       setIsLoading(false);
     }
   };
 
-  const { lastJsonMessage, readyState } = useWebSocket(
-    `ws://${window.location.host}/api/k8s/deployments/watch?namespace=${namespace}`,
-    {
-      shouldReconnect: () => true,
-      reconnectInterval: 3000,
-      onError: (err) => {
-        console.error('Deployments WS error:', err);
-        fetchDeployments();
-      },
-      filter: (message) => {
-        try {
-          JSON.parse(message.data);
-          return true;
-        } catch {
-          return false;
-        }
-      }
-    }
-  );
-
-  useEffect(() => {
-    if (lastJsonMessage) {
-      setDeployments(lastJsonMessage);
-    }
-  }, [lastJsonMessage]);
-
-  useEffect(() => {
+  const startPolling = (interval = 5000) => {
+    stopPolling();
     fetchDeployments();
+    pollingInterval.current = setInterval(fetchDeployments, interval);
+  };
+
+  const stopPolling = () => {
+    if (pollingInterval.current) {
+      clearInterval(pollingInterval.current);
+      pollingInterval.current = null;
+    }
+  };
+
+  useEffect(() => {
+    startPolling();
+    return () => stopPolling();
   }, [namespace]);
 
   const scaleDeployment = async (name, replicas) => {
     try {
+      setIsLoading(true);
       const res = await fetch(
         `/api/k8s/deployments/${name}/scale?namespace=${namespace}`,
         {
@@ -71,12 +64,37 @@ export default function useDeployments(namespace = 'default') {
     }
   };
 
+  const restartDeployment = async (name) => {
+    try {
+      setIsLoading(true);
+      const res = await fetch(
+        `/api/k8s/deployments/${name}/restart?namespace=${namespace}`,
+        {
+          method: 'POST',
+          headers: { 
+            'Authorization': `Bearer ${localStorage.getItem('token')}`,
+            'Content-Type': 'application/json'
+          }
+        }
+      );
+      if (!res.ok) throw new Error(await res.text());
+      await fetchDeployments();
+      return true;
+    } catch (err) {
+      setError(`Restart failed: ${err.message}`);
+      return false;
+    }
+  };
+
   return {
     deployments,
     isLoading,
     error,
-    wsReadyState: readyState,
+    lastUpdated,
     scaleDeployment,
-    refresh: fetchDeployments
+    restartDeployment,
+    refresh: fetchDeployments,
+    startPolling,
+    stopPolling
   };
 }

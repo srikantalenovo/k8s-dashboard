@@ -1,60 +1,49 @@
-import { useState, useEffect } from 'react';
-import { useWebSocket } from 'react-use-websocket';
+import { useState, useEffect, useRef } from 'react';
 
 export default function useHelm(namespace = 'default') {
   const [releases, setReleases] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
+  const pollingInterval = useRef(null);
+  const [lastUpdated, setLastUpdated] = useState(null);
 
-  // REST fallback
   const fetchReleases = async () => {
     try {
-      setIsLoading(true);
       const res = await fetch(`/api/k8s/helm/releases?namespace=${namespace}`);
       if (!res.ok) throw new Error(await res.text());
-      setReleases(await res.json());
+      const data = await res.json();
+      setReleases(data);
+      setLastUpdated(new Date());
+      setError(null);
     } catch (err) {
       setError(err.message);
+      stopPolling();
     } finally {
       setIsLoading(false);
     }
   };
 
-  // WebSocket connection
-  const { lastJsonMessage, readyState } = useWebSocket(
-    `ws://${window.location.host}/api/k8s/helm/watch?namespace=${namespace}`,
-    {
-      shouldReconnect: () => true,
-      reconnectInterval: 3000,
-      onError: (err) => {
-        console.error('Helm WS error:', err);
-        fetchReleases(); // Fallback to REST
-      },
-      filter: (message) => {
-        try {
-          JSON.parse(message.data);
-          return true;
-        } catch {
-          return false;
-        }
-      }
-    }
-  );
-
-  // Update state when WS messages arrive
-  useEffect(() => {
-    if (lastJsonMessage) {
-      setReleases(lastJsonMessage);
-    }
-  }, [lastJsonMessage]);
-
-  // Initial fetch
-  useEffect(() => {
+  const startPolling = (interval = 10000) => { // Longer interval for Helm
+    stopPolling();
     fetchReleases();
+    pollingInterval.current = setInterval(fetchReleases, interval);
+  };
+
+  const stopPolling = () => {
+    if (pollingInterval.current) {
+      clearInterval(pollingInterval.current);
+      pollingInterval.current = null;
+    }
+  };
+
+  useEffect(() => {
+    startPolling();
+    return () => stopPolling();
   }, [namespace]);
 
   const uninstallRelease = async (releaseName) => {
     try {
+      setIsLoading(true);
       const res = await fetch(
         `/api/k8s/helm/releases/${releaseName}?namespace=${namespace}`,
         {
@@ -78,8 +67,10 @@ export default function useHelm(namespace = 'default') {
     releases,
     isLoading,
     error,
-    wsReadyState: readyState,
+    lastUpdated,
     uninstallRelease,
-    refresh: fetchReleases
+    refresh: fetchReleases,
+    startPolling,
+    stopPolling
   };
 }
