@@ -404,7 +404,121 @@ class K8sService {
     creationTimestamp: ing.metadata.creationTimestamp
   }));
   }
+ // ======================
+  // Enhanced Pod Operations
+  // ======================
+  async getPodsWithStatus(namespace = 'default', statusFilter) {
+    await this.verifyClusterConnection();
+    const res = await this.coreV1Api.listNamespacedPod(namespace);
+    
+    return res.body.items
+      .filter(pod => !statusFilter || pod.status.phase === statusFilter)
+      .map(pod => ({
+        name: pod.metadata.name,
+        namespace: pod.metadata.namespace,
+        status: pod.status.phase,
+        nodeName: pod.spec.nodeName,
+        restarts: pod.status.containerStatuses?.reduce((acc, cs) => acc + cs.restartCount, 0) || 0,
+        conditions: pod.status.conditions,
+        createdAt: pod.metadata.creationTimestamp
+      }));
+  }
+
+  async streamPodLogs(name, namespace = 'default', tailLines = 100) {
+    await this.verifyClusterConnection();
+    return this.coreV1Api.readNamespacedPodLog(
+      name,
+      namespace,
+      undefined, // container
+      true,     // follow (stream)
+      undefined,
+      undefined,
+      undefined,
+      tailLines,
+      true       // timestamps
+    );
+  }
+
+  async deletePod(name, namespace = 'default') {
+    await this.verifyClusterConnection();
+    await this.coreV1Api.deleteNamespacedPod(name, namespace);
+    logger.info(`🗑️ Deleted pod ${name} in ${namespace}`);
+    return { success: true };
+  }
+
+  async restartPod(name, namespace = 'default') {
+    await this.verifyClusterConnection();
+    // Trigger redeploy by patching annotation
+    await this.appsV1Api.patchNamespacedDeployment(
+      name,
+      namespace,
+      {
+        spec: {
+          template: {
+            metadata: {
+              annotations: {
+                'kubectl.kubernetes.io/restartedAt': new Date().toISOString()
+              }
+            }
+          }
+        }
+      },
+      undefined, 'StrategicMergePatch'
+    );
+    logger.info(`🔄 Restarted pod ${name} in ${namespace}`);
+    return { success: true };
+  }
+
+  // ======================
+  // Deployment Operations
+  // ======================
+  async scaleDeployment(name, namespace = 'default', replicas) {
+    await this.verifyClusterConnection();
+    if (replicas < 0 || replicas > 20) throw new Error('Replicas must be 0-20');
+    
+    await this.appsV1Api.patchNamespacedDeploymentScale(
+      name,
+      namespace,
+      { spec: { replicas: parseInt(replicas) } },
+      undefined, undefined, undefined, undefined, 'StrategicMergePatch'
+    );
+    logger.info(`⚖️ Scaled ${namespace}/${name} to ${replicas} replicas`);
+    return { success: true };
+  }
+
+  // ======================
+  // Helm Operations
+  // ======================
+  async listHelmReleases(namespace) {
+    try {
+      const cmd = namespace 
+        ? `helm list --namespace ${namespace} --output json`
+        : `helm list --all-namespaces --output json`;
+      
+      const { stdout } = await execAsync(cmd);
+      return JSON.parse(stdout);
+    } catch (err) {
+      logger.error(`Helm list failed: ${err.message}`);
+      throw new Error('Failed to list releases. Ensure Helm is installed.');
+    }
+  }
+
+  async uninstallHelmRelease(name, namespace) {
+    if (!name) throw new Error('Release name required');
+    
+    try {
+      await execAsync(`helm uninstall ${name} --namespace ${namespace || 'default'}`);
+      logger.info(`🗑️ Uninstalled Helm release ${name}`);
+      return { success: true };
+    } catch (err) {
+      logger.error(`Helm uninstall failed: ${err.stderr || err.message}`);
+      throw new Error(`Failed to uninstall ${name}`);
+    }
+  }
+
 }
+
+
  
 // Singleton export
 // Initialize and export as singleton

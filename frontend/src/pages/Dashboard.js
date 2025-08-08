@@ -33,7 +33,7 @@ import {
 import ResourcesView from '../pages/ResourcesView';
 import AnalyzerView from '../pages/AnalyzerView';
 import Sidebar from "../components/Sidebar";
-import PodActionsView from '../pages/AnalyzerView/PodActionsView';
+
 
 
 
@@ -375,7 +375,6 @@ const Dashboard = () => {
       case 'Analyzer': return hasPermission(currentUser, 'analyzer', 'read') ? <AnalyzerView /> : <HomeView />;
       case 'Resources': return hasPermission(currentUser, 'nodes', 'read') ? <ResourcesView currentUser={currentUser} /> : <HomeView />;
       case 'Logs': return hasPermission(currentUser, 'logs', 'read') ? <LogsView /> : <HomeView />;
-      case 'PodActions': return hasPermission(currentUser, 'pods', 'read') ? <PodActionsView currentUser={currentUser} /> : <HomeView />;
       default: return <HomeView />;
     }
   };
