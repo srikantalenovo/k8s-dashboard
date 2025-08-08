@@ -7,7 +7,7 @@ import dotenv from 'dotenv';
 import authRoutes from './routes/auth.routes.js';
 import adminRoutes from './routes/admin.routes.js';
 import k8sRoutes from './routes/k8s.routes.js';
-import podActionsRoutes from './routes/podActions.routes.js';
+
 
 dotenv.config();
 
