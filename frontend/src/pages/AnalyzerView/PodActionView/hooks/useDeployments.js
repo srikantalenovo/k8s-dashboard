@@ -5,47 +5,45 @@ export default function useDeployments(namespace = 'default') {
   const [deployments, setDeployments] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [connectionStatus, setConnectionStatus] = useState('connecting');
 
   const fetchDeployments = async () => {
     try {
       setIsLoading(true);
       const res = await fetch(`/api/k8s/deployments?namespace=${namespace}`);
       if (!res.ok) throw new Error(await res.text());
-      const data = await res.json();
-      setDeployments(data);
+      setDeployments(await res.json());
     } catch (err) {
       setError(err.message);
-      setConnectionStatus('disconnected');
     } finally {
       setIsLoading(false);
     }
   };
 
-  // WebSocket connection
-  const { lastMessage, readyState } = useWebSocket(
+  const { lastJsonMessage, readyState } = useWebSocket(
     `ws://${window.location.host}/api/k8s/deployments/watch?namespace=${namespace}`,
     {
-      onOpen: () => {
-        console.log('Deployments WS connected');
-        setConnectionStatus('connected');
-      },
+      shouldReconnect: () => true,
+      reconnectInterval: 3000,
       onError: (err) => {
         console.error('Deployments WS error:', err);
-        setConnectionStatus('error');
-        fetchDeployments(); // Fallback to REST
+        fetchDeployments();
       },
-      shouldReconnect: () => true,
-      reconnectAttempts: 10,
-      reconnectInterval: 3000,
+      filter: (message) => {
+        try {
+          JSON.parse(message.data);
+          return true;
+        } catch {
+          return false;
+        }
+      }
     }
   );
 
   useEffect(() => {
-    if (lastMessage?.data) {
-      setDeployments(JSON.parse(lastMessage.data));
+    if (lastJsonMessage) {
+      setDeployments(lastJsonMessage);
     }
-  }, [lastMessage]);
+  }, [lastJsonMessage]);
 
   useEffect(() => {
     fetchDeployments();
@@ -53,34 +51,22 @@ export default function useDeployments(namespace = 'default') {
 
   const scaleDeployment = async (name, replicas) => {
     try {
-      const res = await fetch(`/api/k8s/deployments/${name}/scale`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        },
-        body: JSON.stringify({ namespace, replicas })
-      });
+      const res = await fetch(
+        `/api/k8s/deployments/${name}/scale?namespace=${namespace}`,
+        {
+          method: 'PATCH',
+          headers: { 
+            'Authorization': `Bearer ${localStorage.getItem('token')}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ replicas: parseInt(replicas) })
+        }
+      );
       if (!res.ok) throw new Error(await res.text());
+      await fetchDeployments();
       return true;
     } catch (err) {
       setError(`Scale failed: ${err.message}`);
-      return false;
-    }
-  };
-
-  const restartDeployment = async (name) => {
-    try {
-      const res = await fetch(`/api/k8s/deployments/${name}/restart`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        }
-      });
-      if (!res.ok) throw new Error(await res.text());
-      return true;
-    } catch (err) {
-      setError(`Restart failed: ${err.message}`);
       return false;
     }
   };
@@ -89,9 +75,8 @@ export default function useDeployments(namespace = 'default') {
     deployments,
     isLoading,
     error,
-    connectionStatus,
+    wsReadyState: readyState,
     scaleDeployment,
-    restartDeployment,
-    refresh: fetchDeployments,
+    refresh: fetchDeployments
   };
 }
