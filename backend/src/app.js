@@ -22,6 +22,6 @@ app.use(express.json());
 app.use('/api/auth', authRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/k8s', k8sRoutes);
-app.use('/api/k8s/pod-actions', podActionsRoutes);
+app.use('/api/pod-actions', podActionsRoutes);
 
 export default app;

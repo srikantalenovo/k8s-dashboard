@@ -1,236 +1,298 @@
-import React, { useEffect, useState } from 'react';
+// src/views/PodActionsView/PodActionTable.js
+import React, { useState } from "react";
 import {
   Box,
   Table,
+  TableHead,
   TableBody,
+  TableRow,
   TableCell,
   TableContainer,
-  TableHead,
-  TableRow,
   Paper,
   IconButton,
   Tooltip,
   Dialog,
-  DialogActions,
-  DialogContent,
   DialogTitle,
+  DialogContent,
+  DialogActions,
   Button,
   TextField,
   Typography,
-  CircularProgress
-} from '@mui/material';
+  Chip
+} from "@mui/material";
+import RestartAltIcon from "@mui/icons-material/RestartAlt";
+import DeleteIcon from "@mui/icons-material/Delete";
+import TerminalIcon from "@mui/icons-material/Terminal";
+import ScaleIcon from "@mui/icons-material/Scale";
+import UninstallIcon from "@mui/icons-material/RemoveCircleOutline";
+import CloseIcon from "@mui/icons-material/Close";
+import CheckCircleIcon from "@mui/icons-material/CheckCircle";
+import WarningAmberIcon from "@mui/icons-material/WarningAmber";
+import CancelIcon from "@mui/icons-material/Cancel";
 
-import DeleteIcon from '@mui/icons-material/Delete';
-import RestartAltIcon from '@mui/icons-material/RestartAlt';
-import ArticleIcon from '@mui/icons-material/Article';
-import StorageIcon from '@mui/icons-material/Storage';
-import CloseIcon from '@mui/icons-material/Close';
+const API_PREFIXES = [
+  "/api/pod-actions",
+  "/api/podactions"
+];
 
-const PodActionTable = ({ type, namespace }) => {
-  const [data, setData] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [confirmOpen, setConfirmOpen] = useState(false);
-  const [confirmAction, setConfirmAction] = useState(null);
-  const [logModalOpen, setLogModalOpen] = useState(false);
-  const [selectedResource, setSelectedResource] = useState(null);
-  const [logs, setLogs] = useState('');
-  const [scaleModalOpen, setScaleModalOpen] = useState(false);
-  const [replicas, setReplicas] = useState(1);
-
-  useEffect(() => {
-    fetchData();
-  }, [type, namespace]);
-
-  const fetchData = async () => {
-    setLoading(true);
+const tryRequestFallback = async (paths, options = {}) => {
+  for (const p of paths) {
     try {
-      let url = '';
-      if (type === 'pods') url = `/api/pod-actions/pods?namespace=${namespace}`;
-      if (type === 'deployments') url = `/api/pod-actions/deployments?namespace=${namespace}`;
-      if (type === 'helm') url = `/api/pod-actions/helm?namespace=${namespace}`;
-      
-      const res = await fetch(url);
-      const result = await res.json();
-      setData(result);
+      const res = await fetch(p, options);
+      if (res.ok) {
+        const ct = res.headers.get("content-type") || "";
+        if (ct.includes("application/json")) return await res.json();
+        return await res.text();
+      }
+      // if 4xx/5xx, continue trying next path
+    } catch (e) {
+      // ignore and try next
+    }
+  }
+  throw new Error("All endpoints failed");
+};
+
+export default function PodActionTable({ title, type, data, namespace = "default", onActionComplete = () => {}, statusMeta }) {
+  // type: "pods" | "deployments" | "helm"
+  const [confirm, setConfirm] = useState({ open: false, action: null, item: null });
+  const [logDialog, setLogDialog] = useState({ open: false, content: "", name: "" });
+  const [scaleDialog, setScaleDialog] = useState({ open: false, name: "", replicas: 1 });
+  const [busy, setBusy] = useState(false);
+
+  const statusBadge = (status) => {
+    const meta = statusMeta ? statusMeta(status) : { color: "text.secondary", Icon: null, label: status };
+    const Icon = meta.Icon;
+    return (
+      <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+        {Icon ? <Icon sx={{ color: meta.color }} fontSize="small" /> : null}
+        <Typography sx={{ color: meta.color, fontWeight: 600 }}>{meta.label || status}</Typography>
+      </Box>
+    );
+  };
+
+  // Build endpoints per action with fallbacks
+  const endpointFor = (action, resourceName, replicas = undefined) => {
+    // Pod actions
+    if (type === "pods") {
+      if (action === "list") return API_PREFIXES.map(p => `${p}/pods?namespace=${namespace}`);
+      if (action === "delete") return API_PREFIXES.map(p => `${p}/pods/${resourceName}?namespace=${namespace}`);
+      if (action === "restart") return API_PREFIXES.map(p => `${p}/pods/${resourceName}/restart?namespace=${namespace}`);
+      if (action === "logs") return API_PREFIXES.map(p => `${p}/pods/${resourceName}/logs?namespace=${namespace}`).concat(API_PREFIXES.map(p=>`${p}/pods/${resourceName}/logs`));
+    }
+    if (type === "deployments") {
+      if (action === "list") return API_PREFIXES.map(p => `${p}/deployments?namespace=${namespace}`);
+      if (action === "restart") return API_PREFIXES.map(p => `${p}/deployments/${resourceName}/restart?namespace=${namespace}`);
+      if (action === "delete") return API_PREFIXES.map(p => `${p}/deployments/${resourceName}?namespace=${namespace}`);
+      if (action === "scale") return API_PREFIXES.map(p => `${p}/deployments/${resourceName}/scale?namespace=${namespace}`);
+    }
+    if (type === "helm") {
+      if (action === "list") return API_PREFIXES.map(p => `${p}/helm?namespace=${namespace}`).concat(API_PREFIXES.map(p=>`${p}/helm-releases?namespace=${namespace}`));
+      if (action === "uninstall") return API_PREFIXES.map(p => `${p}/helm/${resourceName}?namespace=${namespace}`).concat(API_PREFIXES.map(p=>`${p}/helm/uninstall/${resourceName}?namespace=${namespace}`));
+    }
+    return [""];
+  };
+
+  const handleConfirmOpen = (action, item) => setConfirm({ open: true, action, item });
+  const handleConfirmClose = () => setConfirm({ open: false, action: null, item: null });
+
+  const performAction = async () => {
+    const { action, item } = confirm;
+    if (!action || !item) return;
+    setBusy(true);
+
+    try {
+      if (action === "logs" && type === "pods") {
+        const paths = endpointFor("logs", item.name);
+        const res = await tryRequestFallback(paths);
+        setLogDialog({ open: true, content: typeof res === "string" ? res : JSON.stringify(res, null, 2), name: item.name });
+      } else if (action === "delete") {
+        const paths = endpointFor("delete", item.name);
+        // DELETE
+        await tryRequestFallback(paths, { method: "DELETE" });
+        await onActionComplete();
+      } else if (action === "restart") {
+        const paths = endpointFor("restart", item.name);
+        await tryRequestFallback(paths, { method: "POST" });
+        await onActionComplete();
+      } else if (action === "uninstall") {
+        const paths = endpointFor("uninstall", item.name);
+        await tryRequestFallback(paths, { method: "DELETE" });
+        await onActionComplete();
+      }
     } catch (err) {
-      console.error(`Error fetching ${type}:`, err);
+      console.error("Action failed:", err);
+      // Optionally show toast
     } finally {
-      setLoading(false);
+      setBusy(false);
+      handleConfirmClose();
     }
   };
 
-  const handleConfirm = (action, resource) => {
-    setSelectedResource(resource);
-    setConfirmAction(action);
-    setConfirmOpen(true);
+  const openScale = (item) => {
+    setScaleDialog({ open: true, name: item.name, replicas: Number(item.replicas || 1) });
   };
 
-  const executeAction = async () => {
-    if (!selectedResource || !confirmAction) return;
+  const submitScale = async () => {
+    setBusy(true);
     try {
-      let url = '';
-      let method = 'POST';
-
-      if (confirmAction === 'delete') {
-        url = `/api/pod-actions/${type}/${selectedResource.name}?namespace=${namespace}`;
-        method = 'DELETE';
-      }
-      if (confirmAction === 'restart') {
-        url = `/api/pod-actions/${type}/${selectedResource.name}/restart?namespace=${namespace}`;
-      }
-      if (confirmAction === 'uninstall') {
-        url = `/api/pod-actions/helm/${selectedResource.name}/uninstall?namespace=${namespace}`;
-      }
-
-      await fetch(url, { method });
-      fetchData();
-    } catch (err) {
-      console.error(`Error executing ${confirmAction} on ${type}:`, err);
-    } finally {
-      setConfirmOpen(false);
-    }
-  };
-
-  const openLogs = async (resource) => {
-    setSelectedResource(resource);
-    setLogs('');
-    setLogModalOpen(true);
-    try {
-      const res = await fetch(`/api/pod-actions/pods/${resource.name}/logs?namespace=${namespace}`);
-      const result = await res.text();
-      setLogs(result);
-    } catch (err) {
-      console.error('Error fetching logs:', err);
-    }
-  };
-
-  const openScaleDialog = (resource) => {
-    setSelectedResource(resource);
-    setScaleModalOpen(true);
-    setReplicas(resource.replicas || 1);
-  };
-
-  const handleScale = async () => {
-    try {
-      await fetch(`/api/pod-actions/deployments/${selectedResource.name}/scale?namespace=${namespace}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ replicas })
+      const paths = endpointFor("scale", scaleDialog.name);
+      // prefer POST with JSON body
+      await tryRequestFallback(paths, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ replicas: Number(scaleDialog.replicas) })
       });
-      fetchData();
+      await onActionComplete();
     } catch (err) {
-      console.error('Error scaling deployment:', err);
+      console.error("Scale failed:", err);
     } finally {
-      setScaleModalOpen(false);
+      setBusy(false);
+      setScaleDialog({ open: false, name: "", replicas: 1 });
     }
   };
 
   return (
     <Box>
-      {loading ? (
-        <CircularProgress />
-      ) : (
-        <TableContainer component={Paper} sx={{ borderRadius: 2, boxShadow: 3 }}>
-          <Table>
-            <TableHead>
+      <TableContainer component={Paper} sx={{ borderRadius: 2, boxShadow: 2 }}>
+        <Table size="small">
+          <TableHead>
+            <TableRow>
+              <TableCell sx={{ fontWeight: 700 }}>Name</TableCell>
+              <TableCell sx={{ fontWeight: 700 }}>Status</TableCell>
+              {type === "deployments" && <TableCell sx={{ fontWeight: 700 }}>Replicas</TableCell>}
+              <TableCell sx={{ fontWeight: 700 }}>Actions</TableCell>
+            </TableRow>
+          </TableHead>
+          <TableBody>
+            {(!data || data.length === 0) ? (
               <TableRow>
-                <TableCell>Name</TableCell>
-                <TableCell>Status</TableCell>
-                {type === 'deployments' && <TableCell>Replicas</TableCell>}
-                <TableCell>Actions</TableCell>
+                <TableCell colSpan={4} align="center">No resources found.</TableCell>
               </TableRow>
-            </TableHead>
-            <TableBody>
-              {data.map((item, idx) => (
-                <TableRow key={idx}>
-                  <TableCell>{item.name}</TableCell>
-                  <TableCell>{item.status}</TableCell>
-                  {type === 'deployments' && <TableCell>{item.replicas}</TableCell>}
+            ) : data.map((item, idx) => {
+              const st = item.status || item.raw?.status || "UNKNOWN";
+              const meta = statusMeta ? statusMeta(st) : { color: "text.secondary", Icon: null, label: st };
+              const Icon = meta.Icon;
+              return (
+                <TableRow key={`${type}-${idx}`} hover>
                   <TableCell>
-                    {type === 'pods' && (
+                    <Typography sx={{ fontWeight: 600 }}>{item.name}</Typography>
+                    <Typography variant="caption" color="text.secondary">{item.namespace}</Typography>
+                  </TableCell>
+
+                  <TableCell>
+                    <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                      {Icon ? <Icon sx={{ color: meta.color }} fontSize="small" /> : null}
+                      <Typography sx={{ color: meta.color, fontWeight: 600 }}>{meta.label || st}</Typography>
+                    </Box>
+                  </TableCell>
+
+                  {type === "deployments" && <TableCell>{item.replicas ?? "-"}</TableCell>}
+
+                  <TableCell>
+                    {type === "pods" && (
                       <>
-                        <Tooltip title="View Logs">
-                          <IconButton onClick={() => openLogs(item)}><ArticleIcon /></IconButton>
+                        <Tooltip title="View logs">
+                          <IconButton size="small" onClick={() => handleConfirmOpen("logs", item)}>
+                            <TerminalIcon />
+                          </IconButton>
                         </Tooltip>
-                        <Tooltip title="Restart Pod">
-                          <IconButton onClick={() => handleConfirm('restart', item)}><RestartAltIcon /></IconButton>
+                        <Tooltip title="Restart pod">
+                          <IconButton size="small" color="warning" onClick={() => handleConfirmOpen("restart", item)}>
+                            <RestartAltIcon />
+                          </IconButton>
                         </Tooltip>
-                        <Tooltip title="Delete Pod">
-                          <IconButton onClick={() => handleConfirm('delete', item)}><DeleteIcon /></IconButton>
+                        <Tooltip title="Delete pod">
+                          <IconButton size="small" color="error" onClick={() => handleConfirmOpen("delete", item)}>
+                            <DeleteIcon />
+                          </IconButton>
                         </Tooltip>
                       </>
                     )}
-                    {type === 'deployments' && (
+
+                    {type === "deployments" && (
                       <>
-                        <Tooltip title="Restart Deployment">
-                          <IconButton onClick={() => handleConfirm('restart', item)}><RestartAltIcon /></IconButton>
+                        <Tooltip title="Restart deployment">
+                          <IconButton size="small" color="warning" onClick={() => handleConfirmOpen("restart", item)}>
+                            <RestartAltIcon />
+                          </IconButton>
                         </Tooltip>
-                        <Tooltip title="Scale Deployment">
-                          <IconButton onClick={() => openScaleDialog(item)}><StorageIcon /></IconButton>
+                        <Tooltip title="Scale deployment">
+                          <IconButton size="small" onClick={() => openScale(item)}>
+                            <ScaleIcon />
+                          </IconButton>
                         </Tooltip>
-                        <Tooltip title="Delete Deployment">
-                          <IconButton onClick={() => handleConfirm('delete', item)}><DeleteIcon /></IconButton>
+                        <Tooltip title="Delete deployment">
+                          <IconButton size="small" color="error" onClick={() => handleConfirmOpen("delete", item)}>
+                            <DeleteIcon />
+                          </IconButton>
                         </Tooltip>
                       </>
                     )}
-                    {type === 'helm' && (
-                      <Tooltip title="Uninstall Release">
-                        <IconButton onClick={() => handleConfirm('uninstall', item)}><DeleteIcon /></IconButton>
+
+                    {type === "helm" && (
+                      <Tooltip title="Uninstall Helm release">
+                        <IconButton size="small" color="error" onClick={() => handleConfirmOpen("uninstall", item)}>
+                          <UninstallIcon />
+                        </IconButton>
                       </Tooltip>
                     )}
                   </TableCell>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </TableContainer>
-      )}
+              );
+            })}
+          </TableBody>
+        </Table>
+      </TableContainer>
 
-      {/* Confirmation Dialog */}
-      <Dialog open={confirmOpen} onClose={() => setConfirmOpen(false)}>
-        <DialogTitle>Confirm {confirmAction}</DialogTitle>
+      {/* Confirm dialog */}
+      <Dialog open={confirm.open} onClose={() => setConfirm({ open: false, action: null, item: null })}>
+        <DialogTitle>Confirm {confirm.action}</DialogTitle>
         <DialogContent>
-          Are you sure you want to {confirmAction} "{selectedResource?.name}"?
+          <Typography>Are you sure you want to <strong>{confirm.action}</strong> <code>{confirm.item?.name}</code> ?</Typography>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setConfirmOpen(false)}>Cancel</Button>
-          <Button onClick={executeAction} color="error">Yes</Button>
+          <Button onClick={() => setConfirm({ open: false, action: null, item: null })}>Cancel</Button>
+          <Button color="error" onClick={performAction} disabled={busy}>
+            {busy ? "Processing..." : "Confirm"}
+          </Button>
         </DialogActions>
       </Dialog>
 
-      {/* Logs Modal */}
-      <Dialog open={logModalOpen} onClose={() => setLogModalOpen(false)} maxWidth="md" fullWidth>
+      {/* Logs dialog */}
+      <Dialog open={logDialog.open} onClose={() => setLogDialog({ open: false, content: "", name: "" })} fullWidth maxWidth="lg">
         <DialogTitle>
-          Logs - {selectedResource?.name}
-          <IconButton onClick={() => setLogModalOpen(false)} sx={{ position: 'absolute', right: 8, top: 8 }}>
+          Logs — {logDialog.name}
+          <IconButton sx={{ position: "absolute", right: 8, top: 8 }} onClick={() => setLogDialog({ open: false, content: "", name: "" })}>
             <CloseIcon />
           </IconButton>
         </DialogTitle>
         <DialogContent>
-          <Typography component="pre" sx={{ whiteSpace: 'pre-wrap' }}>{logs}</Typography>
+          <Paper variant="outlined" sx={{ p: 2, bgcolor: "#0b1220", color: "#e6eef8", whiteSpace: "pre-wrap", fontFamily: "monospace", fontSize: 13 }}>
+            <Typography component="pre">{logDialog.content}</Typography>
+          </Paper>
         </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setLogDialog({ open: false, content: "", name: "" })}>Close</Button>
+        </DialogActions>
       </Dialog>
 
-      {/* Scale Dialog */}
-      <Dialog open={scaleModalOpen} onClose={() => setScaleModalOpen(false)}>
-        <DialogTitle>Scale Deployment - {selectedResource?.name}</DialogTitle>
-        <DialogContent>
+      {/* Scale dialog */}
+      <Dialog open={scaleDialog.open} onClose={() => setScaleDialog({ open: false, name: "", replicas: 1 })}>
+        <DialogTitle>Scale Deployment — {scaleDialog.name}</DialogTitle>
+        <DialogContent sx={{ display: "flex", gap: 2, mt: 1 }}>
           <TextField
             label="Replicas"
             type="number"
-            value={replicas}
-            onChange={(e) => setReplicas(Number(e.target.value))}
-            fullWidth
-            sx={{ mt: 2 }}
+            value={scaleDialog.replicas}
+            onChange={(e) => setScaleDialog(d => ({ ...d, replicas: Number(e.target.value || 0) }))}
+            inputProps={{ min: 0 }}
           />
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setScaleModalOpen(false)}>Cancel</Button>
-          <Button onClick={handleScale} variant="contained">Scale</Button>
+          <Button onClick={() => setScaleDialog({ open: false, name: "", replicas: 1 })}>Cancel</Button>
+          <Button onClick={submitScale} variant="contained">Scale</Button>
         </DialogActions>
       </Dialog>
     </Box>
   );
-};
-
-export default PodActionTable;
+}
