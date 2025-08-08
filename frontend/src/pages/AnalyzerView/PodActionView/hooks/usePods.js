@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useWebSocket } from 'react-use-websocket/dist/lib/use-websocket';
+import { useWebSocket } from 'react-use-websocket';
 
 export default function usePods(namespace) {
   const [pods, setPods] = useState([]);

@@ -4,7 +4,7 @@ WORKDIR /app
 
 COPY package*.json ./
 
-RUN npm install react-circular-progressbar @mui/icons-material framer-motion react-chartjs-2 chart.js lucide-react
+RUN npm install react-circular-progressbar @mui/icons-material framer-motion react-chartjs-2 chart.js lucide-react react-use-websocket@latest
 
 COPY . .
 
