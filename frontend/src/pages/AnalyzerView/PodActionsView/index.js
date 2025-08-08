@@ -1,112 +1,79 @@
-// PodActionsView/index.js
-import React from 'react';
-import { Box, Grid, Typography, Card, CardContent } from '@mui/material';
-import PodActionTable from './PodActionTable';
-import DeploymentActionTable from './DeploymentActionTable';
-import HelmActionTable from './HelmActionTable';
+import React, { useEffect, useState } from "react";
+import { Box, Typography, Grid, Card, CardContent, CircularProgress } from "@mui/material";
+import PodActionTable from "./PodActionTable";
+import HelmActionTable from "./HelmActionTable";
+import DeploymentActionTable from "./DeploymentActionTable";
 
-const PodActionsView = () => {
+export default function PodActionsView() {
+  const [pods, setPods] = useState([]);
+  const [deployments, setDeployments] = useState([]);
+  const [helmReleases, setHelmReleases] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  const fetchData = async () => {
+    setLoading(true);
+    try {
+      const [podsRes, deploysRes, helmRes] = await Promise.all([
+        fetch("/api/pod-actions/pods").then((res) => res.json()),
+        fetch("/api/pod-actions/deployments").then((res) => res.json()),
+        fetch("/api/pod-actions/helm").then((res) => res.json()),
+      ]);
+
+      setPods(podsRes || []);
+      setDeployments(deploysRes || []);
+      setHelmReleases(helmRes || []);
+    } catch (err) {
+      console.error("Error fetching pod actions data:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchData();
+  }, []);
+
+  if (loading) {
+    return (
+      <Box display="flex" justifyContent="center" alignItems="center" height="80vh">
+        <CircularProgress />
+      </Box>
+    );
+  }
+
   return (
-    <Box sx={{ p: 3 }}>
-      {/* Page Title */}
-      <Typography
-        variant="h4"
-        gutterBottom
-        sx={{
-          fontWeight: 'bold',
-          mb: 3,
-          background: 'linear-gradient(90deg, #4cafef, #3f51b5)',
-          WebkitBackgroundClip: 'text',
-          WebkitTextFillColor: 'transparent',
-        }}
-      >
+    <Box p={3}>
+      <Typography variant="h4" fontWeight="bold" gutterBottom>
         Pod Actions
       </Typography>
-
       <Grid container spacing={3}>
-        {/* Pods Section */}
-        <Grid item xs={12} md={12}>
-          <Card
-            sx={{
-              boxShadow: 4,
-              borderRadius: 3,
-              background: 'linear-gradient(145deg, #ffffff, #f1f5f9)',
-              transition: 'transform 0.2s ease',
-              '&:hover': { transform: 'translateY(-4px)' },
-            }}
-          >
+        <Grid item xs={12}>
+          <Card sx={{ borderRadius: 3, boxShadow: 4 }}>
             <CardContent>
-              <Typography
-                variant="h6"
-                sx={{
-                  fontWeight: 'bold',
-                  mb: 2,
-                  color: '#1e293b',
-                }}
-              >
-                Pods
-              </Typography>
-              <PodActionTable />
+              <Typography variant="h6" gutterBottom>Pods</Typography>
+              <PodActionTable pods={pods} fetchPods={fetchData} />
             </CardContent>
           </Card>
         </Grid>
 
-        {/* Deployments Section */}
-        <Grid item xs={12} md={12}>
-          <Card
-            sx={{
-              boxShadow: 4,
-              borderRadius: 3,
-              background: 'linear-gradient(145deg, #ffffff, #f1f5f9)',
-              transition: 'transform 0.2s ease',
-              '&:hover': { transform: 'translateY(-4px)' },
-            }}
-          >
+        <Grid item xs={12}>
+          <Card sx={{ borderRadius: 3, boxShadow: 4 }}>
             <CardContent>
-              <Typography
-                variant="h6"
-                sx={{
-                  fontWeight: 'bold',
-                  mb: 2,
-                  color: '#1e293b',
-                }}
-              >
-                Deployments
-              </Typography>
-              <DeploymentActionTable />
+              <Typography variant="h6" gutterBottom>Deployments</Typography>
+              <DeploymentActionTable deployments={deployments} fetchDeployments={fetchData} />
             </CardContent>
           </Card>
         </Grid>
 
-        {/* Helm Releases Section */}
-        <Grid item xs={12} md={12}>
-          <Card
-            sx={{
-              boxShadow: 4,
-              borderRadius: 3,
-              background: 'linear-gradient(145deg, #ffffff, #f1f5f9)',
-              transition: 'transform 0.2s ease',
-              '&:hover': { transform: 'translateY(-4px)' },
-            }}
-          >
+        <Grid item xs={12}>
+          <Card sx={{ borderRadius: 3, boxShadow: 4 }}>
             <CardContent>
-              <Typography
-                variant="h6"
-                sx={{
-                  fontWeight: 'bold',
-                  mb: 2,
-                  color: '#1e293b',
-                }}
-              >
-                Helm Releases
-              </Typography>
-              <HelmActionTable />
+              <Typography variant="h6" gutterBottom>Helm Releases</Typography>
+              <HelmActionTable releases={helmReleases} fetchHelm={fetchData} />
             </CardContent>
           </Card>
         </Grid>
       </Grid>
     </Box>
   );
-};
-
-export default PodActionsView;
+}
