@@ -15,7 +15,7 @@ import {
   Add,
   FilterAlt,
 } from '@mui/icons-material';
-import { tokens } from '../../../theme';
+import { tokens } from '../../../../theme';
 
 const ActionToolbar = ({ 
   namespace, 

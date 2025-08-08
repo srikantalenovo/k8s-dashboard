@@ -17,7 +17,7 @@ import {
   History,
   WarningAmber,
 } from '@mui/icons-material';
-import { tokens } from '../../../theme';
+import { tokens } from '../../../../theme';
 
 const HelmTable = ({ releases, namespace }) => {
   const theme = useTheme();

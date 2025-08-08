@@ -25,7 +25,7 @@ import {
   Scale,
   WarningAmber,
 } from '@mui/icons-material';
-import { tokens } from '../../../theme';
+import { tokens } from '../../../../theme';
 
 const DeploymentTable = ({ deployments, namespace }) => {
   const theme = useTheme();

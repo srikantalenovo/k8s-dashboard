@@ -23,7 +23,7 @@ import {
 } from '@mui/icons-material';
 import LogsModal from './LogsModal';
 import ActionToolbar from './ActionToolbar';
-import { tokens } from '../../../theme';
+import { tokens } from '../../../../theme';
 
 const PodTable = ({ pods, namespace, onNamespaceChange, onReload }) => {
   const theme = useTheme();

@@ -15,7 +15,7 @@ import {
   Pause,
   PlayArrow,
 } from '@mui/icons-material';
-import { tokens } from '../../../theme';
+import { tokens } from '../../../../theme';
 
 const LogsModal = ({ open, onClose, pod, namespace }) => {
   const theme = useTheme();
