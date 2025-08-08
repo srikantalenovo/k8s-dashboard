@@ -1,73 +1,117 @@
-// DeploymentActionTable.js
-import React, { useState } from 'react';
+// PodActionsView/DeploymentActionTable.js
+import React, { useState, useEffect } from "react";
 import {
-  Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
-  Paper, Button, Dialog, DialogTitle, DialogContent, DialogActions,
-  TextField
-} from '@mui/material';
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  Paper,
+  Button,
+  Typography,
+} from "@mui/material";
 
-export default function DeploymentActionTable({ deployments, onRestart, onScale }) {
-  const [confirmOpen, setConfirmOpen] = useState(false);
-  const [scaleOpen, setScaleOpen] = useState(false);
-  const [selectedDeployment, setSelectedDeployment] = useState(null);
-  const [replicaCount, setReplicaCount] = useState('');
+export default function DeploymentActionTable() {
+  const [deployments, setDeployments] = useState([]);
+  const [loading, setLoading] = useState(false);
 
-  const handleRestartClick = (deployment) => {
-    setSelectedDeployment(deployment);
-    setConfirmOpen(true);
-  };
-
-  const handleScaleClick = (deployment) => {
-    setSelectedDeployment(deployment);
-    setReplicaCount('');
-    setScaleOpen(true);
-  };
-
-  const confirmRestart = () => {
-    if (selectedDeployment) {
-      onRestart(selectedDeployment);
+  const fetchDeployments = async () => {
+    try {
+      setLoading(true);
+      const res = await fetch("/api/pod-actions/deployments");
+      if (!res.ok) throw new Error("Failed to fetch deployments");
+      const data = await res.json();
+      // Ensure we always set an array
+      setDeployments(Array.isArray(data) ? data : []);
+    } catch (err) {
+      console.error("Error fetching deployments:", err);
+      setDeployments([]);
+    } finally {
+      setLoading(false);
     }
-    setConfirmOpen(false);
   };
 
-  const confirmScale = () => {
-    if (selectedDeployment && replicaCount !== '') {
-      onScale(selectedDeployment, parseInt(replicaCount, 10));
+  useEffect(() => {
+    fetchDeployments();
+  }, []);
+
+  const handleRestart = async (name) => {
+    if (window.confirm(`Restart deployment ${name}?`)) {
+      await fetch(`/api/pod-actions/deployments/${name}/restart`, {
+        method: "POST",
+      });
+      fetchDeployments();
     }
-    setScaleOpen(false);
+  };
+
+  const handleDelete = async (name) => {
+    if (window.confirm(`Delete deployment ${name}?`)) {
+      await fetch(`/api/pod-actions/deployments/${name}`, {
+        method: "DELETE",
+      });
+      fetchDeployments();
+    }
+  };
+
+  const handleScale = async (name) => {
+    const replicas = prompt("Enter number of replicas:");
+    if (replicas !== null) {
+      await fetch(`/api/pod-actions/deployments/${name}/scale`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ replicas: parseInt(replicas, 10) }),
+      });
+      fetchDeployments();
+    }
   };
 
   return (
-    <>
-      <TableContainer component={Paper} sx={{ borderRadius: 2, boxShadow: 3 }}>
+    <TableContainer component={Paper} sx={{ mt: 2 }}>
+      <Typography variant="h6" sx={{ p: 2 }}>
+        Deployment Actions
+      </Typography>
+      {loading ? (
+        <Typography sx={{ p: 2 }}>Loading deployments...</Typography>
+      ) : deployments.length === 0 ? (
+        <Typography sx={{ p: 2 }}>No deployments found.</Typography>
+      ) : (
         <Table>
           <TableHead>
             <TableRow>
-              <TableCell>Name</TableCell>
-              <TableCell>Namespace</TableCell>
-              <TableCell>Replicas</TableCell>
-              <TableCell>Actions</TableCell>
+              <TableCell><strong>Name</strong></TableCell>
+              <TableCell><strong>Namespace</strong></TableCell>
+              <TableCell><strong>Replicas</strong></TableCell>
+              <TableCell><strong>Actions</strong></TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
-            {deployments.map((dep) => (
-              <TableRow key={dep.name}>
-                <TableCell>{dep.name}</TableCell>
-                <TableCell>{dep.namespace}</TableCell>
-                <TableCell>{dep.replicas}</TableCell>
+            {deployments.map((deployment) => (
+              <TableRow key={deployment.name}>
+                <TableCell>{deployment.name}</TableCell>
+                <TableCell>{deployment.namespace}</TableCell>
+                <TableCell>{deployment.replicas}</TableCell>
                 <TableCell>
                   <Button
                     variant="outlined"
                     color="primary"
-                    onClick={() => handleRestartClick(dep)}
+                    onClick={() => handleRestart(deployment.name)}
                     sx={{ mr: 1 }}
                   >
                     Restart
                   </Button>
                   <Button
                     variant="outlined"
+                    color="error"
+                    onClick={() => handleDelete(deployment.name)}
+                    sx={{ mr: 1 }}
+                  >
+                    Delete
+                  </Button>
+                  <Button
+                    variant="outlined"
                     color="secondary"
-                    onClick={() => handleScaleClick(dep)}
+                    onClick={() => handleScale(deployment.name)}
                   >
                     Scale
                   </Button>
@@ -76,39 +120,7 @@ export default function DeploymentActionTable({ deployments, onRestart, onScale 
             ))}
           </TableBody>
         </Table>
-      </TableContainer>
-
-      {/* Confirm Restart Dialog */}
-      <Dialog open={confirmOpen} onClose={() => setConfirmOpen(false)}>
-        <DialogTitle>Confirm Restart</DialogTitle>
-        <DialogContent>
-          Are you sure you want to restart deployment <b>{selectedDeployment?.name}</b>?
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setConfirmOpen(false)}>Cancel</Button>
-          <Button color="error" onClick={confirmRestart}>Restart</Button>
-        </DialogActions>
-      </Dialog>
-
-      {/* Scale Dialog */}
-      <Dialog open={scaleOpen} onClose={() => setScaleOpen(false)}>
-        <DialogTitle>Scale Deployment</DialogTitle>
-        <DialogContent>
-          <TextField
-            autoFocus
-            margin="dense"
-            label="Replicas"
-            type="number"
-            fullWidth
-            value={replicaCount}
-            onChange={(e) => setReplicaCount(e.target.value)}
-          />
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setScaleOpen(false)}>Cancel</Button>
-          <Button onClick={confirmScale}>Scale</Button>
-        </DialogActions>
-      </Dialog>
-    </>
+      )}
+    </TableContainer>
   );
 }
