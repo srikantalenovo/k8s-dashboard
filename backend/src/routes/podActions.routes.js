@@ -1,4 +1,4 @@
-// podActions.routes.js
+// routes/podActions.routes.js
 import express from 'express';
 import {
   listPods,
