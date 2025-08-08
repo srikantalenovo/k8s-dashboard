@@ -1,186 +1,181 @@
-// src/views/PodActionsView/PodActionTable.js
-import React, { useState } from "react";
+import React, { useEffect, useState } from 'react';
 import {
   Box,
-  Paper,
-  Typography,
-  IconButton,
-  Tooltip,
   Table,
   TableBody,
   TableCell,
   TableContainer,
   TableHead,
   TableRow,
-  CircularProgress,
+  Paper,
+  IconButton,
+  Tooltip,
   Dialog,
-  DialogTitle,
-  DialogContent,
   DialogActions,
+  DialogContent,
+  DialogTitle,
   Button,
-} from "@mui/material";
-import DeleteIcon from "@mui/icons-material/Delete";
-import RestartAltIcon from "@mui/icons-material/RestartAlt";
-import VisibilityIcon from "@mui/icons-material/Visibility";
-import { styled } from "@mui/material/styles";
+  TextField,
+  Typography,
+  CircularProgress
+} from '@mui/material';
 
-const StyledTableCell = styled(TableCell)(({ theme }) => ({
-  fontWeight: 500,
-  fontSize: "0.9rem",
-  borderBottom: `1px solid ${theme.palette.divider}`,
-}));
+import DeleteIcon from '@mui/icons-material/Delete';
+import RestartAltIcon from '@mui/icons-material/RestartAlt';
+import ArticleIcon from '@mui/icons-material/Article';
+import StorageIcon from '@mui/icons-material/Storage';
+import CloseIcon from '@mui/icons-material/Close';
 
-const StyledIconButton = styled(IconButton)(({ theme }) => ({
-  padding: 6,
-  "&:hover": {
-    backgroundColor: theme.palette.action.hover,
-  },
-}));
+const PodActionTable = ({ type, namespace }) => {
+  const [data, setData] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [confirmAction, setConfirmAction] = useState(null);
+  const [logModalOpen, setLogModalOpen] = useState(false);
+  const [selectedResource, setSelectedResource] = useState(null);
+  const [logs, setLogs] = useState('');
+  const [scaleModalOpen, setScaleModalOpen] = useState(false);
+  const [replicas, setReplicas] = useState(1);
 
-export default function PodActionTable({
-  title,
-  data = [],
-  loading = false,
-  onDelete,
-  onRestart,
-  onViewLogs,
-}) {
-  const safeData = Array.isArray(data) ? data : [];
+  useEffect(() => {
+    fetchData();
+  }, [type, namespace]);
 
-  const [confirmDialog, setConfirmDialog] = useState({
-    open: false,
-    type: null,
-    item: null,
-  });
-
-  const handleConfirm = (type, item) => {
-    setConfirmDialog({ open: true, type, item });
+  const fetchData = async () => {
+    setLoading(true);
+    try {
+      let url = '';
+      if (type === 'pods') url = `/api/pod-actions/pods?namespace=${namespace}`;
+      if (type === 'deployments') url = `/api/pod-actions/deployments?namespace=${namespace}`;
+      if (type === 'helm') url = `/api/pod-actions/helm?namespace=${namespace}`;
+      
+      const res = await fetch(url);
+      const result = await res.json();
+      setData(result);
+    } catch (err) {
+      console.error(`Error fetching ${type}:`, err);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleConfirmClose = () => {
-    setConfirmDialog({ open: false, type: null, item: null });
+  const handleConfirm = (action, resource) => {
+    setSelectedResource(resource);
+    setConfirmAction(action);
+    setConfirmOpen(true);
   };
 
-  const handleConfirmAction = () => {
-    if (confirmDialog.type === "delete" && onDelete) {
-      onDelete(confirmDialog.item);
+  const executeAction = async () => {
+    if (!selectedResource || !confirmAction) return;
+    try {
+      let url = '';
+      let method = 'POST';
+
+      if (confirmAction === 'delete') {
+        url = `/api/pod-actions/${type}/${selectedResource.name}?namespace=${namespace}`;
+        method = 'DELETE';
+      }
+      if (confirmAction === 'restart') {
+        url = `/api/pod-actions/${type}/${selectedResource.name}/restart?namespace=${namespace}`;
+      }
+      if (confirmAction === 'uninstall') {
+        url = `/api/pod-actions/helm/${selectedResource.name}/uninstall?namespace=${namespace}`;
+      }
+
+      await fetch(url, { method });
+      fetchData();
+    } catch (err) {
+      console.error(`Error executing ${confirmAction} on ${type}:`, err);
+    } finally {
+      setConfirmOpen(false);
     }
-    if (confirmDialog.type === "restart" && onRestart) {
-      onRestart(confirmDialog.item);
+  };
+
+  const openLogs = async (resource) => {
+    setSelectedResource(resource);
+    setLogs('');
+    setLogModalOpen(true);
+    try {
+      const res = await fetch(`/api/pod-actions/pods/${resource.name}/logs?namespace=${namespace}`);
+      const result = await res.text();
+      setLogs(result);
+    } catch (err) {
+      console.error('Error fetching logs:', err);
     }
-    handleConfirmClose();
+  };
+
+  const openScaleDialog = (resource) => {
+    setSelectedResource(resource);
+    setScaleModalOpen(true);
+    setReplicas(resource.replicas || 1);
+  };
+
+  const handleScale = async () => {
+    try {
+      await fetch(`/api/pod-actions/deployments/${selectedResource.name}/scale?namespace=${namespace}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ replicas })
+      });
+      fetchData();
+    } catch (err) {
+      console.error('Error scaling deployment:', err);
+    } finally {
+      setScaleModalOpen(false);
+    }
   };
 
   return (
-    <Paper
-      elevation={3}
-      sx={{
-        p: 2,
-        borderRadius: 3,
-        background: "linear-gradient(145deg, #ffffff, #f3f4f6)",
-        boxShadow: "0 4px 20px rgba(0,0,0,0.05)",
-      }}
-    >
-      {/* Title */}
-      <Typography
-        variant="h6"
-        sx={{
-          fontWeight: 600,
-          mb: 2,
-          color: "text.primary",
-        }}
-      >
-        {title}
-      </Typography>
-
-      {/* Loading State */}
+    <Box>
       {loading ? (
-        <Box display="flex" justifyContent="center" p={4}>
-          <CircularProgress size={32} />
-        </Box>
-      ) : safeData.length === 0 ? (
-        <Box display="flex" justifyContent="center" p={3}>
-          <Typography variant="body2" color="text.secondary">
-            No resources found.
-          </Typography>
-        </Box>
+        <CircularProgress />
       ) : (
-        <TableContainer
-          sx={{
-            borderRadius: 2,
-            overflow: "hidden",
-          }}
-        >
-          <Table size="small">
+        <TableContainer component={Paper} sx={{ borderRadius: 2, boxShadow: 3 }}>
+          <Table>
             <TableHead>
               <TableRow>
-                <StyledTableCell>Name</StyledTableCell>
-                <StyledTableCell>Namespace</StyledTableCell>
-                <StyledTableCell>Status</StyledTableCell>
-                <StyledTableCell align="center">Actions</StyledTableCell>
+                <TableCell>Name</TableCell>
+                <TableCell>Status</TableCell>
+                {type === 'deployments' && <TableCell>Replicas</TableCell>}
+                <TableCell>Actions</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
-              {safeData.map((item, idx) => (
-                <TableRow
-                  key={idx}
-                  hover
-                  sx={{
-                    "&:hover": {
-                      backgroundColor: "action.hover",
-                    },
-                  }}
-                >
-                  <TableCell>{item.name || "—"}</TableCell>
-                  <TableCell>{item.namespace || "—"}</TableCell>
+              {data.map((item, idx) => (
+                <TableRow key={idx}>
+                  <TableCell>{item.name}</TableCell>
+                  <TableCell>{item.status}</TableCell>
+                  {type === 'deployments' && <TableCell>{item.replicas}</TableCell>}
                   <TableCell>
-                    <Typography
-                      variant="body2"
-                      sx={{
-                        fontWeight: 500,
-                        color:
-                          item.status?.toLowerCase() === "running"
-                            ? "success.main"
-                            : "error.main",
-                      }}
-                    >
-                      {item.status || "Unknown"}
-                    </Typography>
-                  </TableCell>
-                  <TableCell align="center">
-                    {/* View Logs */}
-                    {onViewLogs && (
-                      <Tooltip title="View Logs">
-                        <StyledIconButton
-                          color="primary"
-                          onClick={() => onViewLogs(item)}
-                        >
-                          <VisibilityIcon fontSize="small" />
-                        </StyledIconButton>
-                      </Tooltip>
+                    {type === 'pods' && (
+                      <>
+                        <Tooltip title="View Logs">
+                          <IconButton onClick={() => openLogs(item)}><ArticleIcon /></IconButton>
+                        </Tooltip>
+                        <Tooltip title="Restart Pod">
+                          <IconButton onClick={() => handleConfirm('restart', item)}><RestartAltIcon /></IconButton>
+                        </Tooltip>
+                        <Tooltip title="Delete Pod">
+                          <IconButton onClick={() => handleConfirm('delete', item)}><DeleteIcon /></IconButton>
+                        </Tooltip>
+                      </>
                     )}
-
-                    {/* Restart */}
-                    {onRestart && (
-                      <Tooltip title="Restart">
-                        <StyledIconButton
-                          color="warning"
-                          onClick={() => handleConfirm("restart", item)}
-                        >
-                          <RestartAltIcon fontSize="small" />
-                        </StyledIconButton>
-                      </Tooltip>
+                    {type === 'deployments' && (
+                      <>
+                        <Tooltip title="Restart Deployment">
+                          <IconButton onClick={() => handleConfirm('restart', item)}><RestartAltIcon /></IconButton>
+                        </Tooltip>
+                        <Tooltip title="Scale Deployment">
+                          <IconButton onClick={() => openScaleDialog(item)}><StorageIcon /></IconButton>
+                        </Tooltip>
+                        <Tooltip title="Delete Deployment">
+                          <IconButton onClick={() => handleConfirm('delete', item)}><DeleteIcon /></IconButton>
+                        </Tooltip>
+                      </>
                     )}
-
-                    {/* Delete */}
-                    {onDelete && (
-                      <Tooltip title="Delete">
-                        <StyledIconButton
-                          color="error"
-                          onClick={() => handleConfirm("delete", item)}
-                        >
-                          <DeleteIcon fontSize="small" />
-                        </StyledIconButton>
+                    {type === 'helm' && (
+                      <Tooltip title="Uninstall Release">
+                        <IconButton onClick={() => handleConfirm('uninstall', item)}><DeleteIcon /></IconButton>
                       </Tooltip>
                     )}
                   </TableCell>
@@ -191,36 +186,51 @@ export default function PodActionTable({
         </TableContainer>
       )}
 
-      {/* Confirm Dialog */}
-      <Dialog
-        open={confirmDialog.open}
-        onClose={handleConfirmClose}
-        fullWidth
-        maxWidth="xs"
-      >
-        <DialogTitle sx={{ fontWeight: 600 }}>
-          Confirm {confirmDialog.type === "delete" ? "Delete" : "Restart"} Action
-        </DialogTitle>
+      {/* Confirmation Dialog */}
+      <Dialog open={confirmOpen} onClose={() => setConfirmOpen(false)}>
+        <DialogTitle>Confirm {confirmAction}</DialogTitle>
         <DialogContent>
-          <Typography>
-            Are you sure you want to{" "}
-            {confirmDialog.type === "delete" ? "delete" : "restart"}{" "}
-            <strong>{confirmDialog.item?.name}</strong>?
-          </Typography>
+          Are you sure you want to {confirmAction} "{selectedResource?.name}"?
         </DialogContent>
         <DialogActions>
-          <Button onClick={handleConfirmClose}>Cancel</Button>
-          <Button
-            variant="contained"
-            color={
-              confirmDialog.type === "delete" ? "error" : "warning"
-            }
-            onClick={handleConfirmAction}
-          >
-            {confirmDialog.type === "delete" ? "Delete" : "Restart"}
-          </Button>
+          <Button onClick={() => setConfirmOpen(false)}>Cancel</Button>
+          <Button onClick={executeAction} color="error">Yes</Button>
         </DialogActions>
       </Dialog>
-    </Paper>
+
+      {/* Logs Modal */}
+      <Dialog open={logModalOpen} onClose={() => setLogModalOpen(false)} maxWidth="md" fullWidth>
+        <DialogTitle>
+          Logs - {selectedResource?.name}
+          <IconButton onClick={() => setLogModalOpen(false)} sx={{ position: 'absolute', right: 8, top: 8 }}>
+            <CloseIcon />
+          </IconButton>
+        </DialogTitle>
+        <DialogContent>
+          <Typography component="pre" sx={{ whiteSpace: 'pre-wrap' }}>{logs}</Typography>
+        </DialogContent>
+      </Dialog>
+
+      {/* Scale Dialog */}
+      <Dialog open={scaleModalOpen} onClose={() => setScaleModalOpen(false)}>
+        <DialogTitle>Scale Deployment - {selectedResource?.name}</DialogTitle>
+        <DialogContent>
+          <TextField
+            label="Replicas"
+            type="number"
+            value={replicas}
+            onChange={(e) => setReplicas(Number(e.target.value))}
+            fullWidth
+            sx={{ mt: 2 }}
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setScaleModalOpen(false)}>Cancel</Button>
+          <Button onClick={handleScale} variant="contained">Scale</Button>
+        </DialogActions>
+      </Dialog>
+    </Box>
   );
-}
+};
+
+export default PodActionTable;

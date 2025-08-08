@@ -1,140 +1,115 @@
-// controllers/podActions.controller.js
+// podActions.controller.js
 import k8s from '@kubernetes/client-node';
 import { exec } from 'child_process';
-import util from 'util';
 
-const execAsync = util.promisify(exec);
 const kc = new k8s.KubeConfig();
 kc.loadFromDefault();
-
 const k8sApi = kc.makeApiClient(k8s.CoreV1Api);
 const appsApi = kc.makeApiClient(k8s.AppsV1Api);
 
-// --- POD ACTIONS ---
-export const deletePod = async (req, res) => {
-  const { namespace, podName } = req.body;
+// ---------- LIST ----------
+export const listPods = async (req, res, next) => {
   try {
-    await k8sApi.deleteNamespacedPod(podName, namespace);
-    res.json({ message: `Pod ${podName} deleted successfully.` });
+    const namespace = req.query.namespace || 'default';
+    const pods = await k8sApi.listNamespacedPod(namespace);
+    res.json(pods.body.items);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 };
 
-export const restartPod = async (req, res) => {
-  const { namespace, podName } = req.body;
+export const listDeployments = async (req, res, next) => {
   try {
-    await k8sApi.deleteNamespacedPod(podName, namespace);
-    res.json({ message: `Pod ${podName} restarted.` });
+    const namespace = req.query.namespace || 'default';
+    const deployments = await appsApi.listNamespacedDeployment(namespace);
+    res.json(deployments.body.items);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 };
 
-export const getPodLogs = async (req, res) => {
-  const { namespace, podName, containerName } = req.query;
-  const logApi = kc.makeApiClient(k8s.Log);
-
+export const listHelmReleases = async (req, res, next) => {
   try {
-    const logs = await logApi.log(namespace, podName, containerName, {});
-    res.send(logs.body || '');
+    const namespace = req.query.namespace || 'default';
+    exec(`helm list -n ${namespace} -o json`, (error, stdout) => {
+      if (error) return next(error);
+      res.json(JSON.parse(stdout));
+    });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 };
 
-// --- DEPLOYMENT ACTIONS ---
-export const deleteDeployment = async (req, res) => {
-  const { namespace, deploymentName } = req.body;
+// ---------- ACTIONS ----------
+export const deletePod = async (req, res, next) => {
   try {
-    await appsApi.deleteNamespacedDeployment(deploymentName, namespace);
-    res.json({ message: `Deployment ${deploymentName} deleted.` });
+    const { namespace } = req.query;
+    await k8sApi.deleteNamespacedPod(req.params.name, namespace);
+    res.json({ success: true });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 };
 
-export const restartDeployment = async (req, res) => {
-  const { namespace, deploymentName } = req.body;
+export const restartPod = async (req, res, next) => {
   try {
-    const patch = [
-      {
-        op: 'add',
-        path: '/spec/template/metadata/annotations/restartedAt',
-        value: new Date().toISOString(),
-      },
-    ];
+    const { namespace } = req.query;
+    // restart = delete pod → K8s will recreate
+    await k8sApi.deleteNamespacedPod(req.params.name, namespace);
+    res.json({ success: true, message: 'Pod restarted' });
+  } catch (err) {
+    next(err);
+  }
+};
 
+export const restartDeployment = async (req, res, next) => {
+  try {
+    const { namespace } = req.query;
+    const deploymentName = req.params.name;
     await appsApi.patchNamespacedDeployment(
       deploymentName,
       namespace,
-      patch,
+      { spec: { template: { metadata: { annotations: { 'kubectl.kubernetes.io/restartedAt': new Date().toISOString() } } } } },
       undefined,
       undefined,
       undefined,
       undefined,
-      {
-        headers: { 'Content-Type': 'application/json-patch+json' },
-      }
+      { headers: { 'Content-Type': 'application/merge-patch+json' } }
     );
-
-    res.json({ message: `Deployment ${deploymentName} restarted.` });
+    res.json({ success: true, message: 'Deployment restarted' });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 };
 
-export const scaleDeployment = async (req, res) => {
-  const { namespace, deploymentName, replicas } = req.body;
+export const scaleDeployment = async (req, res, next) => {
   try {
-    const scale = {
-      spec: { replicas },
-    };
-
+    const { namespace, replicas } = req.body;
+    const deploymentName = req.params.name;
     await appsApi.patchNamespacedDeploymentScale(
       deploymentName,
       namespace,
-      scale,
+      { spec: { replicas } },
       undefined,
       undefined,
       undefined,
       undefined,
-      {
-        headers: { 'Content-Type': 'application/merge-patch+json' },
-      }
+      { headers: { 'Content-Type': 'application/merge-patch+json' } }
     );
-
-    res.json({ message: `Deployment ${deploymentName} scaled to ${replicas}.` });
+    res.json({ success: true, message: `Scaled to ${replicas}` });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 };
 
-// --- HELM ACTIONS ---
-export const getHelmReleases = async (req, res) => {
-  const { namespace } = req.query;
-
+export const uninstallHelmRelease = async (req, res, next) => {
   try {
-    const command = namespace
-      ? `helm list -n ${namespace} --output json`
-      : `helm list --all-namespaces --output json`;
-
-    const { stdout } = await execAsync(command);
-    const releases = JSON.parse(stdout);
-
-    res.json(releases);
+    const { namespace } = req.query;
+    exec(`helm uninstall ${req.params.name} -n ${namespace}`, (error) => {
+      if (error) return next(error);
+      res.json({ success: true });
+    });
   } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-};
-
-export const uninstallHelmRelease = async (req, res) => {
-  const { release, namespace } = req.params;
-
-  try {
-    await execAsync(`helm uninstall ${release} -n ${namespace}`);
-    res.json({ message: `Helm release ${release} uninstalled.` });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 };

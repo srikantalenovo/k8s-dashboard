@@ -1,110 +1,78 @@
-import React, { useState, useEffect } from "react";
-import { Box, Grid, Typography, Card, CardContent, CircularProgress } from "@mui/material";
-import PodActionTable from "../PodActionsView/PodActionTable";
+import React, { useState, useEffect } from 'react';
+import { Box, Typography, Divider, CircularProgress, Button } from '@mui/material';
+import RefreshIcon from '@mui/icons-material/Refresh';
+import PodActionTable from './PodActionTable';
 
-export default function PodActionsView() {
+const PodActionsView = () => {
   const [pods, setPods] = useState([]);
   const [deployments, setDeployments] = useState([]);
   const [helmReleases, setHelmReleases] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
+  const [lastUpdated, setLastUpdated] = useState(null);
 
-  // Fetch data from backend
-  const fetchPodActionsData = async () => {
+  const fetchData = async () => {
+    setLoading(true);
     try {
-      setLoading(true);
-      setError("");
-
-      const res = await fetch("/api/k8s/analyzer/health-summary");
-      if (!res.ok) throw new Error("Failed to fetch pod actions data");
-
-      const data = await res.json();
-
-      setPods(data.errorPods || []);
-      setDeployments(data.errorDeployments || []);
-      setHelmReleases(data.helmReleases || []);
+      const [podsRes, deploymentsRes, helmRes] = await Promise.all([
+        fetch('/api/podactions/pods').then(r => r.json()),
+        fetch('/api/podactions/deployments').then(r => r.json()),
+        fetch('/api/podactions/helm-releases').then(r => r.json())
+      ]);
+      setPods(podsRes || []);
+      setDeployments(deploymentsRes || []);
+      setHelmReleases(helmRes || []);
+      setLastUpdated(new Date().toLocaleTimeString());
     } catch (err) {
-      setError(err.message || "Something went wrong while fetching data");
-    } finally {
-      setLoading(false);
+      console.error('Error fetching pod actions data:', err);
     }
+    setLoading(false);
   };
 
   useEffect(() => {
-    fetchPodActionsData();
+    fetchData();
+    const interval = setInterval(fetchData, 30000); // Auto-refresh every 30s
+    return () => clearInterval(interval);
   }, []);
 
   if (loading) {
     return (
-      <Box display="flex" justifyContent="center" alignItems="center" minHeight="60vh">
+      <Box display="flex" justifyContent="center" alignItems="center" height="70vh">
         <CircularProgress />
-      </Box>
-    );
-  }
-
-  if (error) {
-    return (
-      <Box p={4} textAlign="center" color="error.main">
-        <Typography variant="h6">{error}</Typography>
       </Box>
     );
   }
 
   return (
     <Box p={3}>
-      <Typography variant="h4" fontWeight="bold" gutterBottom>
-        Pod Actions
-      </Typography>
+      <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
+        <Typography variant="h4" fontWeight="bold">Pod Actions</Typography>
+        <Box display="flex" alignItems="center" gap={2}>
+          {lastUpdated && (
+            <Typography variant="body2" color="text.secondary">
+              Last updated: {lastUpdated}
+            </Typography>
+          )}
+          <Button variant="outlined" startIcon={<RefreshIcon />} onClick={fetchData}>
+            Refresh
+          </Button>
+        </Box>
+      </Box>
 
-      <Grid container spacing={3}>
-        {/* Pods Card */}
-        <Grid item xs={12}>
-          <Card sx={{ borderRadius: 3, boxShadow: 4, background: "linear-gradient(135deg, #fceabb, #f8b500)" }}>
-            <CardContent>
-              <Typography variant="h5" gutterBottom fontWeight="bold">
-                Pods
-              </Typography>
-              <PodActionTable
-                type="pod"
-                data={pods}
-                onActionComplete={fetchPodActionsData}
-              />
-            </CardContent>
-          </Card>
-        </Grid>
+      {/* Pods Table */}
+      <Typography variant="h6" mb={1}>Pods</Typography>
+      <PodActionTable type="pods" data={pods} refreshData={fetchData} />
+      <Divider sx={{ my: 3 }} />
 
-        {/* Deployments Card */}
-        <Grid item xs={12}>
-          <Card sx={{ borderRadius: 3, boxShadow: 4, background: "linear-gradient(135deg, #a8edea, #fed6e3)" }}>
-            <CardContent>
-              <Typography variant="h5" gutterBottom fontWeight="bold">
-                Deployments
-              </Typography>
-              <PodActionTable
-                type="deployment"
-                data={deployments}
-                onActionComplete={fetchPodActionsData}
-              />
-            </CardContent>
-          </Card>
-        </Grid>
+      {/* Deployments Table */}
+      <Typography variant="h6" mb={1}>Deployments</Typography>
+      <PodActionTable type="deployments" data={deployments} refreshData={fetchData} />
+      <Divider sx={{ my: 3 }} />
 
-        {/* Helm Releases Card */}
-        <Grid item xs={12}>
-          <Card sx={{ borderRadius: 3, boxShadow: 4, background: "linear-gradient(135deg, #d4fc79, #96e6a1)" }}>
-            <CardContent>
-              <Typography variant="h5" gutterBottom fontWeight="bold">
-                Helm Releases
-              </Typography>
-              <PodActionTable
-                type="helm"
-                data={helmReleases}
-                onActionComplete={fetchPodActionsData}
-              />
-            </CardContent>
-          </Card>
-        </Grid>
-      </Grid>
+      {/* Helm Releases Table */}
+      <Typography variant="h6" mb={1}>Helm Releases</Typography>
+      <PodActionTable type="helm" data={helmReleases} refreshData={fetchData} />
     </Box>
   );
-}
+};
+
+export default PodActionsView;

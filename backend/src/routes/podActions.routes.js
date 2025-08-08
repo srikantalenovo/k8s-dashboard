@@ -1,27 +1,34 @@
-// routes/podActions.routes.js
+// podActions.routes.js
 import express from 'express';
 import {
+  listPods,
+  listDeployments,
+  listHelmReleases,
   deletePod,
   restartPod,
-  getPodLogs,
-  deleteDeployment,
   restartDeployment,
   scaleDeployment,
-  getHelmReleases,
-  uninstallHelmRelease,
+  uninstallHelmRelease
 } from '../controllers/podActions.controller.js';
+import { authorize } from '../middleware/rbac.js';
+import noCache from '../middleware/noCache.js';
 
 const router = express.Router();
 
-router.post('/pod/delete', deletePod);
-router.post('/pod/restart', restartPod);
-router.get('/pod/logs', getPodLogs);
+// List
+router.get('/pods', authorize(['admin', 'editor']), noCache, listPods);
+router.get('/deployments', authorize(['admin', 'editor']), noCache, listDeployments);
+router.get('/helm', authorize(['admin', 'editor']), noCache, listHelmReleases);
 
-router.post('/deployment/delete', deleteDeployment);
-router.post('/deployment/restart', restartDeployment);
-router.post('/deployment/scale', scaleDeployment);
+// Pod Actions
+router.delete('/pods/:name', authorize(['admin', 'editor']), noCache, deletePod);
+router.post('/pods/:name/restart', authorize(['admin', 'editor']), noCache, restartPod);
 
-router.get('/helm/releases', getHelmReleases);
-router.delete('/helm/uninstall/:namespace/:release', uninstallHelmRelease);
+// Deployment Actions
+router.post('/deployments/:name/restart', authorize(['admin', 'editor']), noCache, restartDeployment);
+router.post('/deployments/:name/scale', authorize(['admin', 'editor']), noCache, scaleDeployment);
+
+// Helm Actions
+router.delete('/helm/:name', authorize(['admin', 'editor']), noCache, uninstallHelmRelease);
 
 export default router;
