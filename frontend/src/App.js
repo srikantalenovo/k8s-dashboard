@@ -5,7 +5,7 @@ import Login from './pages/Login';
 import Signup from './pages/Signup';
 import Resources from './pages/Resources';
 import AnalyzerView from './pages/AnalyzerView';
-import PodActionView from './pages/AnalyzerView/PodActionsView';
+import PodActionView from './pages/AnalyzerView/PodActionView/PodActionView';
 
 
 function App() {
