@@ -1,40 +1,101 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
+import api from '../../../../services/api';
 
-export default function usePods(namespace = 'default') {
-  const [pods, setPods] = useState([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState(null);
+export default function usePods(namespace = 'default', currentUser) {
+  const [state, setState] = useState({
+    pods: [],
+    isLoading: true,
+    error: null,
+    lastUpdated: null
+  });
   const pollingInterval = useRef(null);
-  const [lastUpdated, setLastUpdated] = useState(null);
 
-  // Main fetch function
-  const fetchPods = async () => {
+  // Permission check (reusable)
+  const hasPermission = useCallback((action) => {
+    if (!currentUser) return false;
+    if (currentUser.role === 'admin') return true;
+    return currentUser.permissions?.some(
+      perm => 
+        (perm.resource === 'pods' || perm.resource === '*') &&
+        (perm.actions.includes(action) || perm.actions.includes('*'))
+    );
+  }, [currentUser]);
+
+  // Unified API error handler
+  const handleApiError = (error, defaultMessage) => {
+    console.error('API Error:', error);
+    return error.response?.data?.message || error.message || defaultMessage;
+  };
+
+  // Main fetch with error handling and permissions
+  const fetchPods = useCallback(async () => {
+    if (!hasPermission('read')) {
+      setState(prev => ({ ...prev, 
+        error: 'Insufficient permissions to view pods',
+        isLoading: false 
+      }));
+      return;
+    }
+
     try {
-      const res = await fetch(`/api/k8s/pods?namespace=${namespace}`);
-      if (!res.ok) throw new Error(await res.text());
-      const data = await res.json();
-      setPods(data);
-      setLastUpdated(new Date());
-      setError(null);
+      const params = new URLSearchParams({ namespace });
+      const { data } = await api.get(`/k8s/pods?${params.toString()}`);
+      setState(prev => ({
+        ...prev,
+        pods: Array.isArray(data) ? data : [data],
+        error: null,
+        lastUpdated: new Date()
+      }));
     } catch (err) {
-      setError(err.message);
+      setState(prev => ({
+        ...prev,
+        error: handleApiError(err, 'Failed to fetch pods')
+      }));
       stopPolling();
     } finally {
-      setIsLoading(false);
+      setState(prev => ({ ...prev, isLoading: false }));
     }
-  };
+  }, [namespace, hasPermission]);
 
-  // Start polling with cleanup
-  const startPolling = (interval = 5000) => {
-    stopPolling(); // Clear existing interval
-    fetchPods(); // Immediate fetch
+  // Polling control
+  const startPolling = useCallback((interval = 5000) => {
+    stopPolling();
+    fetchPods();
     pollingInterval.current = setInterval(fetchPods, interval);
-  };
+  }, [fetchPods]);
 
-  const stopPolling = () => {
-    if (pollingInterval.current) {
-      clearInterval(pollingInterval.current);
-      pollingInterval.current = null;
+  const stopPolling = useCallback(() => {
+    clearInterval(pollingInterval.current);
+    pollingInterval.current = null;
+  }, []);
+
+  // Action handlers
+  const podAction = async (action, podName, method = 'POST') => {
+    if (!hasPermission(action)) {
+      setState(prev => ({ ...prev, 
+        error: `Insufficient permissions to ${action} pods` 
+      }));
+      return false;
+    }
+
+    try {
+      setState(prev => ({ ...prev, isLoading: true }));
+      const params = new URLSearchParams({ namespace });
+      const url = `/k8s/pods/${podName}${action !== 'delete' ? `/${action}` : ''}`;
+      
+      await api({
+        method,
+        url: `${url}?${params.toString()}`
+      });
+
+      await fetchPods();
+      return true;
+    } catch (err) {
+      setState(prev => ({
+        ...prev,
+        error: handleApiError(err, `${action} operation failed`)
+      }));
+      return false;
     }
   };
 
@@ -42,60 +103,12 @@ export default function usePods(namespace = 'default') {
   useEffect(() => {
     startPolling();
     return () => stopPolling();
-  }, [namespace]);
-
-  // Pod actions
-  const deletePod = async (podName) => {
-    try {
-      setIsLoading(true);
-      const res = await fetch(
-        `/api/k8s/pods/${podName}?namespace=${namespace}`,
-        {
-          method: 'DELETE',
-          headers: { 
-            'Authorization': `Bearer ${localStorage.getItem('token')}`,
-            'Content-Type': 'application/json'
-          }
-        }
-      );
-      if (!res.ok) throw new Error(await res.text());
-      await fetchPods(); // Refresh data
-      return true;
-    } catch (err) {
-      setError(`Delete failed: ${err.message}`);
-      return false;
-    }
-  };
-
-  const restartPod = async (podName) => {
-    try {
-      setIsLoading(true);
-      const res = await fetch(
-        `/api/k8s/pods/${podName}/restart?namespace=${namespace}`,
-        {
-          method: 'POST',
-          headers: { 
-            'Authorization': `Bearer ${localStorage.getItem('token')}`,
-            'Content-Type': 'application/json'
-          }
-        }
-      );
-      if (!res.ok) throw new Error(await res.text());
-      await fetchPods(); // Refresh data
-      return true;
-    } catch (err) {
-      setError(`Restart failed: ${err.message}`);
-      return false;
-    }
-  };
+  }, [startPolling, stopPolling]);
 
   return {
-    pods,
-    isLoading,
-    error,
-    lastUpdated,
-    deletePod,
-    restartPod,
+    ...state,
+    deletePod: (podName) => podAction('delete', podName, 'DELETE'),
+    restartPod: (podName) => podAction('restart', podName),
     refresh: fetchPods,
     startPolling,
     stopPolling

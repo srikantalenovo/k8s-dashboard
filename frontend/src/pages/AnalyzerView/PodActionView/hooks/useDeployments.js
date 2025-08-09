@@ -1,98 +1,120 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
+import api from '../../../../services/api';
 
-export default function useDeployments(namespace = 'default') {
-  const [deployments, setDeployments] = useState([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState(null);
+export default function useDeployments(namespace = 'default', currentUser) {
+  const [state, setState] = useState({
+    deployments: [],
+    isLoading: true,
+    error: null,
+    lastUpdated: null
+  });
   const pollingInterval = useRef(null);
-  const [lastUpdated, setLastUpdated] = useState(null);
 
-  const fetchDeployments = async () => {
-    try {
-      const res = await fetch(`/api/k8s/deployments?namespace=${namespace}`);
-      if (!res.ok) throw new Error(await res.text());
-      const data = await res.json();
-      setDeployments(data);
-      setLastUpdated(new Date());
-      setError(null);
-    } catch (err) {
-      setError(err.message);
-      stopPolling();
-    } finally {
-      setIsLoading(false);
-    }
+  // Permission check
+  const hasPermission = useCallback((action) => {
+    if (!currentUser) return false;
+    if (currentUser.role === 'admin') return true;
+    return currentUser.permissions?.some(
+      perm => 
+        (perm.resource === 'deployments' || perm.resource === '*') &&
+        (perm.actions.includes(action) || perm.actions.includes('*'))
+    );
+  }, [currentUser]);
+
+  // Error handler
+  const handleApiError = (error, defaultMessage) => {
+    console.error('Deployments API Error:', error);
+    return error.response?.data?.message || error.message || defaultMessage;
   };
 
-  const startPolling = (interval = 5000) => {
+  // Fetch deployments
+  const fetchDeployments = useCallback(async () => {
+    if (!hasPermission('read')) {
+      setState(prev => ({ ...prev, 
+        error: 'Insufficient permissions to view deployments',
+        isLoading: false 
+      }));
+      return;
+    }
+
+    try {
+      const params = new URLSearchParams({ namespace });
+      const { data } = await api.get(`/k8s/deployments?${params.toString()}`);
+      setState(prev => ({
+        ...prev,
+        deployments: Array.isArray(data) ? data : [data],
+        error: null,
+        lastUpdated: new Date()
+      }));
+    } catch (err) {
+      setState(prev => ({
+        ...prev,
+        error: handleApiError(err, 'Failed to fetch deployments')
+      }));
+      stopPolling();
+    } finally {
+      setState(prev => ({ ...prev, isLoading: false }));
+    }
+  }, [namespace, hasPermission]);
+
+  // Polling control
+  const startPolling = useCallback((interval = 8000) => {
     stopPolling();
     fetchDeployments();
     pollingInterval.current = setInterval(fetchDeployments, interval);
-  };
+  }, [fetchDeployments]);
 
-  const stopPolling = () => {
-    if (pollingInterval.current) {
-      clearInterval(pollingInterval.current);
-      pollingInterval.current = null;
+  const stopPolling = useCallback(() => {
+    clearInterval(pollingInterval.current);
+    pollingInterval.current = null;
+  }, []);
+
+  // Deployment actions
+  const deploymentAction = async (action, deploymentName, payload = {}) => {
+    if (!hasPermission(action)) {
+      setState(prev => ({ ...prev, 
+        error: `Insufficient permissions to ${action} deployments` 
+      }));
+      return false;
+    }
+
+    try {
+      setState(prev => ({ ...prev, isLoading: true }));
+      const params = new URLSearchParams({ namespace });
+      
+      await api({
+        method: action === 'delete' ? 'DELETE' : 'POST',
+        url: `/k8s/deployments/${deploymentName}${
+          action !== 'delete' ? `/${action}` : ''
+        }?${params.toString()}`,
+        data: payload
+      });
+
+      await fetchDeployments();
+      return true;
+    } catch (err) {
+      setState(prev => ({
+        ...prev,
+        error: handleApiError(err, `${action} operation failed`)
+      }));
+      return false;
     }
   };
 
+  // Initialize
   useEffect(() => {
     startPolling();
     return () => stopPolling();
-  }, [namespace]);
-
-  const scaleDeployment = async (name, replicas) => {
-    try {
-      setIsLoading(true);
-      const res = await fetch(
-        `/api/k8s/deployments/${name}/scale?namespace=${namespace}`,
-        {
-          method: 'PATCH',
-          headers: { 
-            'Authorization': `Bearer ${localStorage.getItem('token')}`,
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({ replicas: parseInt(replicas) })
-        }
-      );
-      if (!res.ok) throw new Error(await res.text());
-      await fetchDeployments();
-      return true;
-    } catch (err) {
-      setError(`Scale failed: ${err.message}`);
-      return false;
-    }
-  };
-
-  const restartDeployment = async (name) => {
-    try {
-      setIsLoading(true);
-      const res = await fetch(
-        `/api/k8s/deployments/${name}/restart?namespace=${namespace}`,
-        {
-          method: 'POST',
-          headers: { 
-            'Authorization': `Bearer ${localStorage.getItem('token')}`,
-            'Content-Type': 'application/json'
-          }
-        }
-      );
-      if (!res.ok) throw new Error(await res.text());
-      await fetchDeployments();
-      return true;
-    } catch (err) {
-      setError(`Restart failed: ${err.message}`);
-      return false;
-    }
-  };
+  }, [startPolling, stopPolling]);
 
   return {
-    deployments,
-    isLoading,
-    error,
-    lastUpdated,
-    scaleDeployment,
-    restartDeployment,
+    ...state,
+    scaleDeployment: (name, replicas) => 
+      deploymentAction('scale', name, { replicas }),
+    restartDeployment: (name) => deploymentAction('restart', name),
+    updateDeployment: (name, image) => 
+      deploymentAction('update', name, { image }),
+    deleteDeployment: (name) => deploymentAction('delete', name),
     refresh: fetchDeployments,
     startPolling,
     stopPolling
