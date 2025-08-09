@@ -1,9 +1,12 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
+import useNamespaces from './useNamespaces';
 import { useAuth } from '../../../../context/AuthContext';
 import api from '../../../../services/api';
 
-export default function usePods(namespace = 'default') {
+export default function usePods(initialNamespace = 'default') {
   const { user: currentUser, token } = useAuth();
+  const { namespaces, loading: nsLoading, error: nsError, hasAccess } = useNamespaces();
+  const [namespace, setNamespace] = useState(initialNamespace);
   const [state, setState] = useState({
     pods: [],
     isLoading: true,
@@ -12,7 +15,6 @@ export default function usePods(namespace = 'default') {
   });
   const pollingInterval = useRef(null);
 
-  // Permission check
   const hasPermission = useCallback((action) => {
     if (!token || !currentUser) return false;
     if (currentUser.role === 'admin') return true;
@@ -23,13 +25,20 @@ export default function usePods(namespace = 'default') {
   }, [currentUser, token]);
 
   const stopPolling = useCallback(() => {
-    if (pollingInterval.current) {
-      clearInterval(pollingInterval.current);
-      pollingInterval.current = null;
-    }
+    pollingInterval.current && clearInterval(pollingInterval.current);
+    pollingInterval.current = null;
   }, []);
 
   const fetchPods = useCallback(async () => {
+    if (!hasAccess(namespace)) {
+      setState(prev => ({ ...prev, 
+        pods: [],
+        error: `No access to namespace ${namespace}`,
+        isLoading: false
+      }));
+      return;
+    }
+
     if (!hasPermission('read')) {
       setState(prev => ({ ...prev, 
         pods: [],
@@ -40,18 +49,11 @@ export default function usePods(namespace = 'default') {
     }
 
     try {
-      setState(prev => ({ ...prev, isLoading: true }));
+      setState(prev => ({ ...prev, isLoading: true, error: null }));
       const params = new URLSearchParams({ namespace });
-      const response = await api.get(`/k8s/pods?${params.toString()}`);
+      const { data } = await api.get(`/k8s/pods?${params.toString()}`);
       
-      // Validate response is not HTML
-      if (typeof response.data === 'string' && response.data.startsWith('<!DOCTYPE html>')) {
-        throw new Error('Server returned HTML instead of JSON');
-      }
-
-      // Ensure all pods have IDs
-      const podsData = Array.isArray(response.data) ? response.data : [response.data];
-      const podsWithIds = podsData.map((pod, index) => ({
+      const podsWithIds = (Array.isArray(data) ? data : [data]).map((pod, index) => ({
         ...pod,
         id: pod.metadata?.uid || pod.metadata?.name || `pod-${namespace}-${index}-${Date.now()}`
       }));
@@ -65,14 +67,14 @@ export default function usePods(namespace = 'default') {
     } catch (err) {
       setState(prev => ({
         ...prev,
-        error: err.response?.data?.message || 
-              (err.message.includes('HTML') ? 'API endpoint misconfigured' : 'Failed to fetch pods')
+        error: err.response?.data?.message || 'Failed to fetch pods',
+        pods: []
       }));
       stopPolling();
     } finally {
       setState(prev => ({ ...prev, isLoading: false }));
     }
-  }, [namespace, hasPermission, stopPolling]);
+  }, [namespace, hasPermission, stopPolling, hasAccess]);
 
   const startPolling = useCallback((interval = 5000) => {
     stopPolling();
@@ -82,9 +84,7 @@ export default function usePods(namespace = 'default') {
 
   const podAction = useCallback(async (action, podName, method = 'POST') => {
     if (!hasPermission(action)) {
-      setState(prev => ({ ...prev, 
-        error: `Insufficient permissions to ${action} pods`
-      }));
+      setState(prev => ({ ...prev, error: `Insufficient permissions to ${action} pods` }));
       return false;
     }
 
@@ -107,12 +107,24 @@ export default function usePods(namespace = 'default') {
   }, [namespace, hasPermission, fetchPods]);
 
   useEffect(() => {
+    // Reset to first available namespace if current becomes invalid
+    if (namespaces.length > 0 && !namespaces.includes(namespace)) {
+      setNamespace(namespaces[0]);
+    }
+  }, [namespaces, namespace]);
+
+  useEffect(() => {
     startPolling();
     return () => stopPolling();
   }, [startPolling, stopPolling]);
 
   return {
     ...state,
+    namespaces,
+    namespace,
+    setNamespace,
+    nsLoading,
+    nsError,
     deletePod: (podName) => podAction('delete', podName, 'DELETE'),
     restartPod: (podName) => podAction('restart', podName),
     refresh: fetchPods,

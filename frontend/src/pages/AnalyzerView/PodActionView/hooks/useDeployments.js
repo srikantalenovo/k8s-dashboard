@@ -1,9 +1,12 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
+import useNamespaces from './useNamespaces';
 import { useAuth } from '../../../../context/AuthContext';
 import api from '../../../../services/api';
 
-export default function useDeployments(namespace = 'default') {
+export default function useDeployments(initialNamespace = 'default') {
   const { user: currentUser, token } = useAuth();
+  const { namespaces, loading: nsLoading, error: nsError, hasAccess } = useNamespaces();
+  const [namespace, setNamespace] = useState(initialNamespace);
   const [state, setState] = useState({
     deployments: [],
     isLoading: true,
@@ -22,13 +25,20 @@ export default function useDeployments(namespace = 'default') {
   }, [currentUser, token]);
 
   const stopPolling = useCallback(() => {
-    if (pollingInterval.current) {
-      clearInterval(pollingInterval.current);
-      pollingInterval.current = null;
-    }
+    pollingInterval.current && clearInterval(pollingInterval.current);
+    pollingInterval.current = null;
   }, []);
 
   const fetchDeployments = useCallback(async () => {
+    if (!hasAccess(namespace)) {
+      setState(prev => ({ ...prev, 
+        deployments: [],
+        error: `No access to namespace ${namespace}`,
+        isLoading: false
+      }));
+      return;
+    }
+
     if (!hasPermission('read')) {
       setState(prev => ({ ...prev, 
         deployments: [],
@@ -39,16 +49,11 @@ export default function useDeployments(namespace = 'default') {
     }
 
     try {
-      setState(prev => ({ ...prev, isLoading: true }));
+      setState(prev => ({ ...prev, isLoading: true, error: null }));
       const params = new URLSearchParams({ namespace });
-      const response = await api.get(`/k8s/deployments?${params.toString()}`);
+      const { data } = await api.get(`/k8s/deployments?${params.toString()}`);
       
-      if (typeof response.data === 'string' && response.data.startsWith('<!DOCTYPE html>')) {
-        throw new Error('Server returned HTML instead of JSON');
-      }
-
-      const deploymentsData = Array.isArray(response.data) ? response.data : [response.data];
-      const deploymentsWithIds = deploymentsData.map((deployment, index) => ({
+      const deploymentsWithIds = (Array.isArray(data) ? data : [data]).map((deployment, index) => ({
         ...deployment,
         id: deployment.metadata?.uid || deployment.metadata?.name || `deploy-${namespace}-${index}-${Date.now()}`
       }));
@@ -62,14 +67,14 @@ export default function useDeployments(namespace = 'default') {
     } catch (err) {
       setState(prev => ({
         ...prev,
-        error: err.response?.data?.message || 
-              (err.message.includes('HTML') ? 'API endpoint misconfigured' : 'Failed to fetch deployments')
+        error: err.response?.data?.message || 'Failed to fetch deployments',
+        deployments: []
       }));
       stopPolling();
     } finally {
       setState(prev => ({ ...prev, isLoading: false }));
     }
-  }, [namespace, hasPermission, stopPolling]);
+  }, [namespace, hasPermission, stopPolling, hasAccess]);
 
   const startPolling = useCallback((interval = 8000) => {
     stopPolling();
@@ -79,9 +84,7 @@ export default function useDeployments(namespace = 'default') {
 
   const deploymentAction = useCallback(async (action, name, payload = {}) => {
     if (!hasPermission(action)) {
-      setState(prev => ({ ...prev, 
-        error: `Insufficient permissions to ${action} deployments`
-      }));
+      setState(prev => ({ ...prev, error: `Insufficient permissions to ${action} deployments` }));
       return false;
     }
 
@@ -106,12 +109,23 @@ export default function useDeployments(namespace = 'default') {
   }, [namespace, hasPermission, fetchDeployments]);
 
   useEffect(() => {
+    if (namespaces.length > 0 && !namespaces.includes(namespace)) {
+      setNamespace(namespaces[0]);
+    }
+  }, [namespaces, namespace]);
+
+  useEffect(() => {
     startPolling();
     return () => stopPolling();
   }, [startPolling, stopPolling]);
 
   return {
     ...state,
+    namespaces,
+    namespace,
+    setNamespace,
+    nsLoading,
+    nsError,
     scaleDeployment: (name, replicas) => 
       deploymentAction('scale', name, { replicas }),
     restartDeployment: (name) => deploymentAction('restart', name),

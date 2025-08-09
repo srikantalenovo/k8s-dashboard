@@ -1,9 +1,12 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
+import useNamespaces from './useNamespaces';
 import { useAuth } from '../../../../context/AuthContext';
 import api from '../../../../services/api';
 
-export default function useHelm(namespace = 'default') {
+export default function useHelm(initialNamespace = 'default') {
   const { user: currentUser, token } = useAuth();
+  const { namespaces, loading: nsLoading, error: nsError, hasAccess } = useNamespaces();
+  const [namespace, setNamespace] = useState(initialNamespace);
   const [state, setState] = useState({
     releases: [],
     isLoading: true,
@@ -22,13 +25,20 @@ export default function useHelm(namespace = 'default') {
   }, [currentUser, token]);
 
   const stopPolling = useCallback(() => {
-    if (pollingInterval.current) {
-      clearInterval(pollingInterval.current);
-      pollingInterval.current = null;
-    }
+    pollingInterval.current && clearInterval(pollingInterval.current);
+    pollingInterval.current = null;
   }, []);
 
   const fetchReleases = useCallback(async () => {
+    if (!hasAccess(namespace)) {
+      setState(prev => ({ ...prev, 
+        releases: [],
+        error: `No access to namespace ${namespace}`,
+        isLoading: false
+      }));
+      return;
+    }
+
     if (!hasPermission('read')) {
       setState(prev => ({ ...prev, 
         releases: [],
@@ -39,16 +49,11 @@ export default function useHelm(namespace = 'default') {
     }
 
     try {
-      setState(prev => ({ ...prev, isLoading: true }));
+      setState(prev => ({ ...prev, isLoading: true, error: null }));
       const params = new URLSearchParams({ namespace });
-      const response = await api.get(`/helm/releases?${params.toString()}`);
+      const { data } = await api.get(`/helm/releases?${params.toString()}`);
       
-      if (typeof response.data === 'string' && response.data.startsWith('<!DOCTYPE html>')) {
-        throw new Error('Server returned HTML instead of JSON');
-      }
-
-      const releasesData = Array.isArray(response.data) ? response.data : [response.data];
-      const releasesWithIds = releasesData.map((release, index) => ({
+      const releasesWithIds = (Array.isArray(data) ? data : [data]).map((release, index) => ({
         ...release,
         id: release.name || `release-${namespace}-${index}-${Date.now()}`
       }));
@@ -62,14 +67,14 @@ export default function useHelm(namespace = 'default') {
     } catch (err) {
       setState(prev => ({
         ...prev,
-        error: err.response?.data?.message || 
-              (err.message.includes('HTML') ? 'API endpoint misconfigured' : 'Failed to fetch releases')
+        error: err.response?.data?.message || 'Failed to fetch releases',
+        releases: []
       }));
       stopPolling();
     } finally {
       setState(prev => ({ ...prev, isLoading: false }));
     }
-  }, [namespace, hasPermission, stopPolling]);
+  }, [namespace, hasPermission, stopPolling, hasAccess]);
 
   const startPolling = useCallback((interval = 10000) => {
     stopPolling();
@@ -79,9 +84,7 @@ export default function useHelm(namespace = 'default') {
 
   const helmAction = useCallback(async (action, releaseName, payload = {}) => {
     if (!hasPermission(action)) {
-      setState(prev => ({ ...prev, 
-        error: `Insufficient permissions to ${action} releases`
-      }));
+      setState(prev => ({ ...prev, error: `Insufficient permissions to ${action} releases` }));
       return false;
     }
 
@@ -104,12 +107,23 @@ export default function useHelm(namespace = 'default') {
   }, [namespace, hasPermission, fetchReleases]);
 
   useEffect(() => {
+    if (namespaces.length > 0 && !namespaces.includes(namespace)) {
+      setNamespace(namespaces[0]);
+    }
+  }, [namespaces, namespace]);
+
+  useEffect(() => {
     startPolling();
     return () => stopPolling();
   }, [startPolling, stopPolling]);
 
   return {
     ...state,
+    namespaces,
+    namespace,
+    setNamespace,
+    nsLoading,
+    nsError,
     installRelease: (name, chart, values) => 
       helmAction('install', name, { chart, values }),
     upgradeRelease: (name, chart, values) => 
