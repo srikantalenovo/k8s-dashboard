@@ -12,7 +12,6 @@ export default function useDeployments(namespace = 'default') {
   });
   const pollingInterval = useRef(null);
 
-  // Permission check
   const hasPermission = useCallback((action) => {
     if (!token || !currentUser) return false;
     if (currentUser.role === 'admin') return true;
@@ -22,7 +21,6 @@ export default function useDeployments(namespace = 'default') {
     );
   }, [currentUser, token]);
 
-  // 1. Stop polling (no deps)
   const stopPolling = useCallback(() => {
     if (pollingInterval.current) {
       clearInterval(pollingInterval.current);
@@ -30,7 +28,6 @@ export default function useDeployments(namespace = 'default') {
     }
   }, []);
 
-  // 2. Fetch deployments
   const fetchDeployments = useCallback(async () => {
     if (!hasPermission('read')) {
       setState(prev => ({ ...prev, 
@@ -44,17 +41,29 @@ export default function useDeployments(namespace = 'default') {
     try {
       setState(prev => ({ ...prev, isLoading: true }));
       const params = new URLSearchParams({ namespace });
-      const { data } = await api.get(`/k8s/deployments?${params.toString()}`);
+      const response = await api.get(`/k8s/deployments?${params.toString()}`);
+      
+      if (typeof response.data === 'string' && response.data.startsWith('<!DOCTYPE html>')) {
+        throw new Error('Server returned HTML instead of JSON');
+      }
+
+      const deploymentsData = Array.isArray(response.data) ? response.data : [response.data];
+      const deploymentsWithIds = deploymentsData.map((deployment, index) => ({
+        ...deployment,
+        id: deployment.metadata?.uid || deployment.metadata?.name || `deploy-${namespace}-${index}-${Date.now()}`
+      }));
+
       setState(prev => ({
         ...prev,
-        deployments: Array.isArray(data) ? data : [data],
+        deployments: deploymentsWithIds,
         lastUpdated: new Date(),
         error: null
       }));
     } catch (err) {
       setState(prev => ({
         ...prev,
-        error: err.response?.data?.message || 'Failed to fetch deployments'
+        error: err.response?.data?.message || 
+              (err.message.includes('HTML') ? 'API endpoint misconfigured' : 'Failed to fetch deployments')
       }));
       stopPolling();
     } finally {
@@ -62,14 +71,12 @@ export default function useDeployments(namespace = 'default') {
     }
   }, [namespace, hasPermission, stopPolling]);
 
-  // 3. Start polling
   const startPolling = useCallback((interval = 8000) => {
     stopPolling();
     fetchDeployments();
     pollingInterval.current = setInterval(fetchDeployments, interval);
   }, [fetchDeployments, stopPolling]);
 
-  // Deployment actions
   const deploymentAction = useCallback(async (action, name, payload = {}) => {
     if (!hasPermission(action)) {
       setState(prev => ({ ...prev, 
@@ -98,7 +105,6 @@ export default function useDeployments(namespace = 'default') {
     }
   }, [namespace, hasPermission, fetchDeployments]);
 
-  // Initialize
   useEffect(() => {
     startPolling();
     return () => stopPolling();

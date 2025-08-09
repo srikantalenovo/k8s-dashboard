@@ -22,7 +22,6 @@ export default function usePods(namespace = 'default') {
     );
   }, [currentUser, token]);
 
-  // 1. First declare stopPolling (no dependencies)
   const stopPolling = useCallback(() => {
     if (pollingInterval.current) {
       clearInterval(pollingInterval.current);
@@ -30,7 +29,6 @@ export default function usePods(namespace = 'default') {
     }
   }, []);
 
-  // 2. Then fetchPods (depends on stopPolling)
   const fetchPods = useCallback(async () => {
     if (!hasPermission('read')) {
       setState(prev => ({ ...prev, 
@@ -44,17 +42,31 @@ export default function usePods(namespace = 'default') {
     try {
       setState(prev => ({ ...prev, isLoading: true }));
       const params = new URLSearchParams({ namespace });
-      const { data } = await api.get(`/k8s/pods?${params.toString()}`);
+      const response = await api.get(`/k8s/pods?${params.toString()}`);
+      
+      // Validate response is not HTML
+      if (typeof response.data === 'string' && response.data.startsWith('<!DOCTYPE html>')) {
+        throw new Error('Server returned HTML instead of JSON');
+      }
+
+      // Ensure all pods have IDs
+      const podsData = Array.isArray(response.data) ? response.data : [response.data];
+      const podsWithIds = podsData.map((pod, index) => ({
+        ...pod,
+        id: pod.metadata?.uid || pod.metadata?.name || `pod-${namespace}-${index}-${Date.now()}`
+      }));
+
       setState(prev => ({
         ...prev,
-        pods: Array.isArray(data) ? data : [data],
+        pods: podsWithIds,
         lastUpdated: new Date(),
         error: null
       }));
     } catch (err) {
       setState(prev => ({
         ...prev,
-        error: err.response?.data?.message || 'Failed to fetch pods'
+        error: err.response?.data?.message || 
+              (err.message.includes('HTML') ? 'API endpoint misconfigured' : 'Failed to fetch pods')
       }));
       stopPolling();
     } finally {
@@ -62,14 +74,12 @@ export default function usePods(namespace = 'default') {
     }
   }, [namespace, hasPermission, stopPolling]);
 
-  // 3. Then startPolling (depends on both)
   const startPolling = useCallback((interval = 5000) => {
     stopPolling();
     fetchPods();
     pollingInterval.current = setInterval(fetchPods, interval);
   }, [fetchPods, stopPolling]);
 
-  // Pod actions
   const podAction = useCallback(async (action, podName, method = 'POST') => {
     if (!hasPermission(action)) {
       setState(prev => ({ ...prev, 
@@ -96,7 +106,6 @@ export default function usePods(namespace = 'default') {
     }
   }, [namespace, hasPermission, fetchPods]);
 
-  // Initialize
   useEffect(() => {
     startPolling();
     return () => stopPolling();

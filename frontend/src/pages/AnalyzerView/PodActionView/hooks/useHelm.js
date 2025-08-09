@@ -12,7 +12,6 @@ export default function useHelm(namespace = 'default') {
   });
   const pollingInterval = useRef(null);
 
-  // Permission check
   const hasPermission = useCallback((action) => {
     if (!token || !currentUser) return false;
     if (currentUser.role === 'admin') return true;
@@ -22,7 +21,6 @@ export default function useHelm(namespace = 'default') {
     );
   }, [currentUser, token]);
 
-  // 1. Stop polling (no deps)
   const stopPolling = useCallback(() => {
     if (pollingInterval.current) {
       clearInterval(pollingInterval.current);
@@ -30,7 +28,6 @@ export default function useHelm(namespace = 'default') {
     }
   }, []);
 
-  // 2. Fetch releases
   const fetchReleases = useCallback(async () => {
     if (!hasPermission('read')) {
       setState(prev => ({ ...prev, 
@@ -44,17 +41,29 @@ export default function useHelm(namespace = 'default') {
     try {
       setState(prev => ({ ...prev, isLoading: true }));
       const params = new URLSearchParams({ namespace });
-      const { data } = await api.get(`/helm/releases?${params.toString()}`);
+      const response = await api.get(`/helm/releases?${params.toString()}`);
+      
+      if (typeof response.data === 'string' && response.data.startsWith('<!DOCTYPE html>')) {
+        throw new Error('Server returned HTML instead of JSON');
+      }
+
+      const releasesData = Array.isArray(response.data) ? response.data : [response.data];
+      const releasesWithIds = releasesData.map((release, index) => ({
+        ...release,
+        id: release.name || `release-${namespace}-${index}-${Date.now()}`
+      }));
+
       setState(prev => ({
         ...prev,
-        releases: Array.isArray(data) ? data : [data],
+        releases: releasesWithIds,
         lastUpdated: new Date(),
         error: null
       }));
     } catch (err) {
       setState(prev => ({
         ...prev,
-        error: err.response?.data?.message || 'Failed to fetch Helm releases'
+        error: err.response?.data?.message || 
+              (err.message.includes('HTML') ? 'API endpoint misconfigured' : 'Failed to fetch releases')
       }));
       stopPolling();
     } finally {
@@ -62,14 +71,12 @@ export default function useHelm(namespace = 'default') {
     }
   }, [namespace, hasPermission, stopPolling]);
 
-  // 3. Start polling
   const startPolling = useCallback((interval = 10000) => {
     stopPolling();
     fetchReleases();
     pollingInterval.current = setInterval(fetchReleases, interval);
   }, [fetchReleases, stopPolling]);
 
-  // Helm actions
   const helmAction = useCallback(async (action, releaseName, payload = {}) => {
     if (!hasPermission(action)) {
       setState(prev => ({ ...prev, 
@@ -96,7 +103,6 @@ export default function useHelm(namespace = 'default') {
     }
   }, [namespace, hasPermission, fetchReleases]);
 
-  // Initialize
   useEffect(() => {
     startPolling();
     return () => stopPolling();
