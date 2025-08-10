@@ -1,71 +1,348 @@
 import express from 'express';
-import { coreV1Api } from '../services/k8s.service.js';
-import { authenticate } from '../middleware/authenticate.js';
+import { authorize } from '../middleware/rbac.js';
+import k8sService from '../services/k8s.service.js';
 
 const router = express.Router();
 
+// Helper middleware to disable caching
+const noCache = (req, res, next) => {
+  res.set('Cache-Control', 'no-store');
+  next();
+};
 
-// Get cluster nodes
-router.get('/nodes', authenticate, async (req, res) => {
+// ======================
+// Cluster & Namespace APIs
+// ======================
+
+router.get('/cluster-info', authorize(['admin', 'editor', 'viewer']), noCache, async (req, res, next) => {
   try {
-    const response = await coreV1Api.listNode();
-    const nodes = response.body.items.map(node => ({
-      name: node.metadata.name,
-      status: node.status.conditions.find(c => c.type === 'Ready').status,
-      cpu: node.status.capacity?.cpu || 'N/A',
-      memory: node.status.capacity?.memory || 'N/A'
-    }));
-    res.json(nodes);
-  } catch (error) {
-    res.status(500).json({ error: error.message });
+    const data = await k8sService.getClusterInfo();
+    res.json(data);
+  } catch (err) {
+    next(err);
   }
 });
 
-// Get all pods
-router.get('/pods', authenticate, async (req, res) => {
+router.get('/namespaces', authorize(['admin', 'editor', 'viewer']), noCache, async (req, res, next) => {
   try {
-    const response = await coreV1Api.listPodForAllNamespaces();
-    const pods = response.body.items.map(pod => ({
-      name: pod.metadata.name,
-      namespace: pod.metadata.namespace,
-      status: pod.status.phase,
-      node: pod.spec.nodeName
-    }));
+    const namespaces = await k8sService.getNamespaces();
+    res.json(namespaces);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ======================
+// Core Resources
+// ======================
+
+router.get('/pods', authorize(['admin', 'editor', 'viewer']), noCache, async (req, res, next) => {
+  try {
+    const namespace = req.query.namespace || 'default';
+    const pods = await k8sService.getPods(namespace);
     res.json(pods);
-  } catch (error) {
-    res.status(500).json({ error: error.message });
+  } catch (err) {
+    next(err);
   }
 });
 
-// Get cluster health
-router.get('/health', authenticate, async (req, res) => {
+router.get('/nodes', authorize(['admin', 'editor', 'viewer']), noCache, async (req, res, next) => {
   try {
-    const [nodes, pods] = await Promise.all([
-      k8sClient.listNode(),
-      k8sClient.listPodForAllNamespaces()
-    ]);
-    
-    const totalNodes = nodes.body.items.length;
-    const readyNodes = nodes.body.items.filter(
-      node => node.status.conditions.find(c => c.type === 'Ready').status === 'True'
-    ).length;
-    
-    const totalPods = pods.body.items.length;
-    const runningPods = pods.body.items.filter(
-      pod => pod.status.phase === 'Running'
-    ).length;
-    
-    res.json({
-      nodeHealth: Math.round((readyNodes / totalNodes) * 100),
-      podHealth: Math.round((runningPods / totalPods) * 100),
-      totalNodes,
-      readyNodes,
-      totalPods,
-      runningPods
-    });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
+    const nodes = await k8sService.getNodes();
+    res.json(nodes);
+  } catch (err) {
+    next(err);
   }
 });
+
+router.get('/services', authorize(['admin', 'editor', 'viewer']), noCache, async (req, res, next) => {
+  try {
+    const namespace = req.query.namespace || 'default';
+    const services = await k8sService.getServices(namespace);
+    res.json(services);
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.get('/configmaps', authorize(['admin', 'editor', 'viewer']), noCache, async (req, res, next) => {
+  try {
+    const namespace = req.query.namespace || 'default';
+    const configmaps = await k8sService.getConfigMaps(namespace);
+    res.json(configmaps);
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.get('/secrets', authorize(['admin', 'editor', 'viewer']), noCache, async (req, res, next) => {
+  try {
+    const namespace = req.query.namespace || 'default';
+    const secrets = await k8sService.getSecrets(namespace);
+    res.json(secrets);
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.get('/persistentvolumes', authorize(['admin', 'editor', 'viewer']), noCache, async (req, res, next) => {
+  try {
+    const pvs = await k8sService.getPersistentVolumes();
+    res.json(pvs);
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.get('/persistentvolumeclaims', authorize(['admin', 'editor', 'viewer']), noCache, async (req, res, next) => {
+  try {
+    const namespace = req.query.namespace || 'default';
+    const pvcs = await k8sService.getPersistentVolumeClaims(namespace);
+    res.json(pvcs);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ======================
+// Workload APIs
+// ======================
+
+router.get('/deployments', authorize(['admin', 'editor', 'viewer']), noCache, async (req, res, next) => {
+  try {
+    const namespace = req.query.namespace || 'default';
+    const deployments = await k8sService.getDeployments(namespace);
+    res.json(deployments);
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.get('/statefulsets', authorize(['admin', 'editor', 'viewer']), noCache, async (req, res, next) => {
+  try {
+    const namespace = req.query.namespace || 'default';
+    const statefulsets = await k8sService.getStatefulSets(namespace);
+    res.json(statefulsets);
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.get('/daemonsets', authorize(['admin', 'editor', 'viewer']), noCache, async (req, res, next) => {
+  try {
+    const namespace = req.query.namespace || 'default';
+    const daemonsets = await k8sService.getDaemonSets(namespace);
+    res.json(daemonsets);
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.get('/replicasets', authorize(['admin', 'editor', 'viewer']), noCache, async (req, res, next) => {
+  try {
+    const namespace = req.query.namespace || 'default';
+    const replicasets = await k8sService.getReplicaSets(namespace);
+    res.json(replicasets);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ======================
+// Networking APIs
+// ======================
+
+router.get('/ingresses', authorize(['admin', 'editor', 'viewer']), noCache, async (req, res, next) => {
+  try {
+    const namespace = req.query.namespace || 'default';
+    const ingresses = await k8sService.getIngresses(namespace);
+    res.json(ingresses);
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.get('/networkpolicies', authorize(['admin', 'editor', 'viewer']), noCache, async (req, res, next) => {
+  try {
+    const namespace = req.query.namespace || 'default';
+    const policies = await k8sService.getNetworkPolicies(namespace);
+    res.json(policies);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ======================
+// Batch Jobs
+// ======================
+
+router.get('/jobs', authorize(['admin', 'editor', 'viewer']), noCache, async (req, res, next) => {
+  try {
+    const namespace = req.query.namespace || 'default';
+    const jobs = await k8sService.getJobs(namespace);
+    res.json(jobs);
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.get('/cronjobs', authorize(['admin', 'editor', 'viewer']), noCache, async (req, res, next) => {
+  try {
+    const namespace = req.query.namespace || 'default';
+    const cronjobs = await k8sService.getCronJobs(namespace);
+    res.json(cronjobs);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ======================
+// Pod Actions
+// ======================
+
+router.delete('/pods/:name', authorize(['admin', 'editor']), noCache, async (req, res, next) => {
+  try {
+    const namespace = req.query.namespace || 'default';
+    const success = await k8sService.deletePod(req.params.name, namespace);
+    res.json({ success });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post('/pods/:name/restart', authorize(['admin', 'editor']), noCache, async (req, res, next) => {
+  try {
+    const namespace = req.query.namespace || 'default';
+    const success = await k8sService.restartPod(req.params.name, namespace);
+    res.json({ success });
+  } catch (err) {
+    next(err);
+  }
+});
+
+
+
+// Analyzer Health Summary Route
+// --------------------------------------------
+import { getClusterHealthSummary } from '../utils/analyzerHelper.js';
+
+router.get('/analyzer/health-summary', async (req, res) => {
+  try {
+    const summary = await getClusterHealthSummary();
+    res.json(summary);
+  } catch (error) {
+    console.error('Error in /analyzer/health-summary:', error);
+    res.status(500).json({ error: 'Failed to get cluster health summary' });
+  }
+});
+
+
+
+router.get('/pods', authorize(['admin', 'editor', 'viewer']), noCache, async (req, res, next) => {
+  try {
+    const { namespace, status } = req.query;
+    const pods = await k8sService.getPodsWithStatus(namespace || 'default', status);
+    res.json(pods);
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.get('/pods/:name/logs', authorize(['admin', 'editor', 'viewer']), noCache, async (req, res) => {
+  try {
+    const { name } = req.params;
+    const { namespace, tailLines = 100 } = req.query;
+    
+    res.setHeader('Content-Type', 'text/plain');
+    const logStream = await k8sService.streamPodLogs(name, namespace || 'default', tailLines);
+    logStream.pipe(res);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.delete('/pods/:name', authorize(['admin', 'editor']), noCache, async (req, res, next) => {
+  try {
+    const { name } = req.params;
+    const { namespace } = req.query;
+    await k8sService.deletePod(name, namespace || 'default');
+    res.json({ success: true });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post('/pods/:name/restart', authorize(['admin', 'editor']), noCache, async (req, res, next) => {
+  try {
+    const { name } = req.params;
+    const { namespace } = req.query;
+    await k8sService.restartPod(name, namespace || 'default');
+    res.json({ success: true });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ======================
+// Deployment Actions
+// ======================
+router.get('/deployments', authorize(['admin', 'editor', 'viewer']), noCache, async (req, res, next) => {
+  try {
+    const { namespace } = req.query;
+    const deployments = await k8sService.getDeployments(namespace || 'default');
+    res.json(deployments);
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.patch('/deployments/:name/scale', authorize(['admin', 'editor']), noCache, async (req, res, next) => {
+  try {
+    const { name } = req.params;
+    const { namespace, replicas } = req.body;
+    await k8sService.scaleDeployment(name, namespace || 'default', replicas);
+    res.json({ success: true });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.delete('/deployments/:name', authorize(['admin', 'editor']), noCache, async (req, res, next) => {
+  try {
+    const { name } = req.params;
+    const { namespace } = req.query;
+    await k8sService.deleteDeployment(name, namespace || 'default');
+    res.json({ success: true });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ======================
+// Helm Release APIs
+// ======================
+router.get('/helm/releases', authorize(['admin', 'editor', 'viewer']), noCache, async (req, res, next) => {
+  try {
+    const { namespace } = req.query;
+    const releases = await k8sService.listHelmReleases(namespace);
+    res.json(releases);
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.delete('/helm/releases/:name', authorize(['admin']), noCache, async (req, res, next) => {
+  try {
+    const { name } = req.params;
+    const { namespace } = req.query;
+    await k8sService.uninstallHelmRelease(name, namespace);
+    res.json({ success: true });
+  } catch (err) {
+    next(err);
+  }
+});
+
+
+
 
 export default router;

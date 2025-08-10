@@ -1,11 +1,11 @@
 // src/utils/permissions.js
 
-/**
- * Check if a user has a specific permission.
- * @param {Object} user - The user object
- * @param {string} permission - The permission to check
- * @returns {boolean}
- */
-export const hasPermission = (user, permission) => {
-  return user?.permissions?.includes(permission);
+export const hasPermission = (user, resource, action) => {
+  if (!user) return false;
+  if (user.role === 'admin') return true;
+  return user.permissions?.some(
+    perm =>
+      (perm.resource === resource || perm.resource === '*') &&
+      (perm.actions.includes(action) || perm.actions.includes('*'))
+  );
 };

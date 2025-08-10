@@ -1,26 +1,55 @@
 // AnalyzerView/index.js
 
-import React, { useState } from 'react';
-import { Tabs, Tab, Box } from '@mui/material';
+import React from 'react';
+import { NavLink, Routes, Route, useLocation } from 'react-router-dom';
+import { Box, Tabs, Tab } from '@mui/material';
+
 import HealthSummary from '../AnalyzerView/HealthSummary';
 import PodActionView from '../AnalyzerView/PodActionView/PodActionView';
+import OperationsCenter from '../AnalyzerView/OperationsCenter';
 
 const AnalyzerView = () => {
-  const [tabIndex, setTabIndex] = useState(0);
+  const location = useLocation();
 
-  const handleTabChange = (event, newValue) => {
-    setTabIndex(newValue);
+  // Map pathnames to tab index for Tabs component controlled value
+  const tabNameToIndex = {
+    '/analyzer/health-summary': 0,
+    '/analyzer/pod-actions': 1,
+    '/analyzer/operations-center': 2,
   };
+
+  // Default to first tab if no match
+  const currentTab = tabNameToIndex[location.pathname] ?? 0;
 
   return (
     <Box sx={{ width: '100%' }}>
-      <Tabs value={tabIndex} onChange={handleTabChange}>
-        <Tab label="Health Summary" />
-        <Tab label="Pod Actions" />
+      <Tabs value={currentTab}>
+        <Tab
+          label="Health Summary"
+          component={NavLink}
+          to="/analyzer/health-summary"
+        />
+        <Tab
+          label="Pod Actions"
+          component={NavLink}
+          to="/analyzer/pod-actions"
+        />
+        <Tab
+          label="Operations Center"
+          component={NavLink}
+          to="/analyzer/operations-center"
+        />
       </Tabs>
 
-      {tabIndex === 0 && <HealthSummary />}
-      {tabIndex === 1 && <PodActionView />}
+      <Box sx={{ mt: 2 }}>
+        <Routes>
+          <Route path="health-summary" element={<HealthSummary />} />
+          <Route path="pod-actions" element={<PodActionView />} />
+          <Route path="operations-center" element={<OperationsCenter />} />
+          {/* Optional redirect or fallback */}
+          <Route path="*" element={<HealthSummary />} />
+        </Routes>
+      </Box>
     </Box>
   );
 };

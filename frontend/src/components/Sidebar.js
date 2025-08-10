@@ -1,7 +1,8 @@
+// src/components/Sidebar.js
 import React, { useState } from 'react';
 import {
-  Drawer, List, ListItem, ListItemIcon, ListItemText, ListItemButton, Link,
-  IconButton, Box, Typography, Divider, Avatar, Tooltip, useTheme
+  Drawer, List, ListItem, ListItemIcon, ListItemText, IconButton, Box,
+  Typography, Divider, Avatar, Tooltip, useTheme
 } from '@mui/material';
 import {
   Menu as MenuIcon,
@@ -9,21 +10,21 @@ import {
   Analytics as AnalyticsIcon,
   Folder as ResourcesIcon,
   List as LogsIcon,
-  Brightness4 as DarkModeIcon,
-  Brightness7 as LightModeIcon,
   Dns as PodIcon
 } from '@mui/icons-material';
+import { NavLink } from 'react-router-dom';
+import { hasPermission } from '../utils/permissions';
 
 const drawerWidth = 240;
 
 const navItems = [
-  { label: 'Home', icon: <HomeIcon />, key: 'Home' },
-  { label: 'Analyzer', icon: <AnalyticsIcon />, key: 'Analyzer' },
-  { label: 'Resources', icon: <ResourcesIcon />, key: 'Resources' },
-  { label: 'Logs', icon: <LogsIcon />, key: 'Logs' }
+  { label: 'Home', icon: <HomeIcon />, key: 'home', path: '/dashboard/home', permission: null },
+  { label: 'Analyzer', icon: <AnalyticsIcon />, key: 'analyzer', path: '/dashboard/analyzer', permission: ['analyzer', 'read'] },
+  { label: 'Resources', icon: <ResourcesIcon />, key: 'resources', path: '/dashboard/resources', permission: ['nodes', 'read'] },
+  { label: 'Logs', icon: <LogsIcon />, key: 'logs', path: '/dashboard/logs', permission: ['logs', 'read'] },
 ];
 
-const Sidebar = ({ currentView, setCurrentView, currentUser }) => {
+const Sidebar = ({ currentUser }) => {
   const [collapsed, setCollapsed] = useState(false);
   const theme = useTheme();
 
@@ -40,20 +41,26 @@ const Sidebar = ({ currentView, setCurrentView, currentUser }) => {
           boxSizing: 'border-box',
           backgroundColor: '#1e1e2f',
           color: '#ffffff',
-          transition: 'width 0.3s'
-        }
+          transition: 'width 0.3s',
+        },
       }}
     >
       <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
         {/* Logo and Collapse Button */}
-        <Box sx={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: collapsed ? 'center' : 'space-between',
-          px: 2,
-          py: 2
-        }}>
-          {!collapsed && <Typography variant="h6" sx={{ fontWeight: 'bold' }}>GrepMind</Typography>}
+        <Box
+          sx={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: collapsed ? 'center' : 'space-between',
+            px: 2,
+            py: 2,
+          }}
+        >
+          {!collapsed && (
+            <Typography variant="h6" sx={{ fontWeight: 'bold' }}>
+              GrepMind
+            </Typography>
+          )}
           <IconButton onClick={toggleCollapse} sx={{ color: '#ffffff' }}>
             <MenuIcon />
           </IconButton>
@@ -63,32 +70,58 @@ const Sidebar = ({ currentView, setCurrentView, currentUser }) => {
 
         {/* Navigation Links */}
         <List>
-          {navItems.map((item) => (
-            <ListItem
-              button
-              key={item.key}
-              selected={currentView === item.key}
-              onClick={() => setCurrentView(item.key)}
-              sx={{
-                color: currentView === item.key ? '#00e5ff' : '#ffffff',
-                backgroundColor: currentView === item.key ? '#2b2b3c' : 'transparent',
-                '&:hover': {
-                  backgroundColor: '#333',
-                },
-              }}
-            >
-              <ListItemIcon sx={{ color: 'inherit', minWidth: collapsed ? 0 : 40 }}>
-                {item.icon}
-              </ListItemIcon>
-              {!collapsed && <ListItemText primary={item.label} />}
-            </ListItem>
-          ))}
+          {navItems
+            .filter((item) => !item.permission || hasPermission(currentUser, ...item.permission))
+            .map((item) => (
+              <ListItem
+                key={item.key}
+                disablePadding
+                sx={{ display: 'block' }}
+              >
+                <NavLink
+                  to={item.path}
+                  style={({ isActive }) => ({
+                    display: 'flex',
+                    alignItems: 'center',
+                    textDecoration: 'none',
+                    padding: '10px 16px',
+                    color: isActive ? '#00e5ff' : '#ffffff',
+                    backgroundColor: isActive ? '#2b2b3c' : 'transparent',
+                    borderRadius: '4px',
+                    margin: '4px 8px',
+                  })}
+                >
+                  <ListItemIcon sx={{ color: 'inherit', minWidth: collapsed ? 0 : 40 }}>
+                    {item.icon}
+                  </ListItemIcon>
+                  {!collapsed && <ListItemText primary={item.label} />}
+                </NavLink>
+              </ListItem>
+            ))}
         </List>
 
-          <ListItemButton component={Link} to="/dashboard/analyzer/pod-actions">
-            <ListItemIcon><PodIcon /></ListItemIcon>
-            <ListItemText primary="Pod Actions" />
-          </ListItemButton>
+        <List>
+          <ListItem disablePadding sx={{ display: 'block' }}>
+            <NavLink
+              to="/dashboard/analyzer/pod-actions"
+              style={({ isActive }) => ({
+                display: 'flex',
+                alignItems: 'center',
+                textDecoration: 'none',
+                padding: '10px 16px',
+                color: isActive ? '#00e5ff' : '#ffffff',
+                backgroundColor: isActive ? '#2b2b3c' : 'transparent',
+                borderRadius: '4px',
+                margin: '4px 8px',
+              })}
+            >
+              <ListItemIcon sx={{ color: 'inherit', minWidth: collapsed ? 0 : 40 }}>
+                <PodIcon />
+              </ListItemIcon>
+              {!collapsed && <ListItemText primary="Pod Actions" />}
+            </NavLink>
+          </ListItem>
+        </List>
 
         <Box sx={{ flexGrow: 1 }} />
 
@@ -101,7 +134,9 @@ const Sidebar = ({ currentView, setCurrentView, currentUser }) => {
               </Avatar>
               <Box>
                 <Typography variant="body2">{currentUser?.username}</Typography>
-                <Typography variant="caption" color="gray">{currentUser?.role}</Typography>
+                <Typography variant="caption" color="gray">
+                  {currentUser?.role}
+                </Typography>
               </Box>
             </Box>
           ) : (

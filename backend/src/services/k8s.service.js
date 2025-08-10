@@ -1,13 +1,19 @@
+// services/k8s.service.js
 import { KubeConfig, CoreV1Api, AppsV1Api, NetworkingV1Api, BatchV1Api } from '@kubernetes/client-node';
 import logger from '../utils/logger.js';
 import fs from 'fs/promises'; // Using fs promises API for async file operations
+import { promisify } from 'util';
+import { exec as execCb } from 'child_process';
+import { formatK8sResponse } from '../utils/responseFormatter.js';
+
+const execAsync = promisify(execCb);
 
 class K8sService {
   constructor() {
     this.kc = new KubeConfig();
     this.coreV1Api = null;
     this.appsV1Api = null;
-    this.networkingV1Api = null;    
+    this.networkingV1Api = null;
     this.batchV1beta1Api = null;
     this.batchV1Api = null;
     this.mode = 'unknown';
@@ -20,7 +26,7 @@ class K8sService {
       this.kc.loadFromCluster();
       this.mode = 'in-cluster';
       logger.info('📦 Using in-cluster Kubernetes config');
-      
+
       // Verify service account token is mounted (in-cluster only)
       if (this.mode === 'in-cluster') {
         try {
@@ -56,18 +62,20 @@ class K8sService {
     this.appsV1Api = this.kc.makeApiClient(AppsV1Api);
     this.batchV1Api = this.kc.makeApiClient(BatchV1Api);
     this.networkingV1Api = this.kc.makeApiClient(NetworkingV1Api);
-      
+
     // Add timeout configuration safely
     if (this.coreV1Api && this.coreV1Api.defaults) {
       const timeout = 10000; // 10 second timeout
       this.coreV1Api.defaults.timeout = timeout;
       this.appsV1Api.defaults.timeout = timeout;
       this.batchV1Api.defaults.timeout = timeout;
-      this.batchV1beta1Api.defaults.timeout = timeout;
+      if (this.batchV1beta1Api && this.batchV1beta1Api.defaults) {
+        this.batchV1beta1Api.defaults.timeout = timeout;
+      }
     } else {
       logger.warn('⚠️ Could not set timeout for Kubernetes API client');
     }
-    
+
     this.initialized = true;
   }
 
@@ -83,16 +91,16 @@ class K8sService {
   async verifyClusterConnection(retryCount = 3, retryDelay = 1000) {
     await this.ensureInitialized();
     logger.info("🔍 Verifying Kubernetes cluster connection...");
-    
+
     let lastError = null;
-    
+
     for (let attempt = 1; attempt <= retryCount; attempt++) {
       try {
         const nsRes = await this.coreV1Api.listNamespace();
         const namespaces = nsRes?.body?.items || [];
-        
-        logger.info(`📦 Parsed Namespace API response count: ${namespaces.length}`, { 
-          timestamp: new Date().toISOString() 
+
+        logger.info(`📦 Parsed Namespace API response count: ${namespaces.length}`, {
+          timestamp: new Date().toISOString()
         });
 
         if (namespaces.length === 0) {
@@ -104,7 +112,7 @@ class K8sService {
           if (attempt === retryCount) {
             throw new Error("Namespace list is empty (RBAC or API issue suspected)");
           }
-          
+
           await new Promise(resolve => setTimeout(resolve, retryDelay));
           continue;
         }
@@ -114,25 +122,29 @@ class K8sService {
         logger.info(`📡 API server: ${this.kc.getCurrentCluster()?.server || "Unknown"}`);
         logger.info(`✅ Found ${namespaces.length} namespaces`);
         return true;
-        
+
       } catch (error) {
         lastError = error;
         logger.warn(`⚠️ Connection attempt ${attempt} failed: ${error.message}`);
-        
+
         if (attempt === retryCount) {
-          logger.error(`❌ Unable to connect to Kubernetes cluster after ${retryCount} attempts`, { 
+          logger.error(`❌ Unable to connect to Kubernetes cluster after ${retryCount} attempts`, {
             error: error.message,
             stack: error.stack
           });
           throw error;
         }
-        
+
         await new Promise(resolve => setTimeout(resolve, retryDelay));
       }
     }
-    
+
     throw lastError;
   }
+
+  // -----------------------
+  // EXISTING LIST / CRUD METHODS (kept as-is)
+  // -----------------------
 
   async getNamespaces() {
     await this.verifyClusterConnection();
@@ -168,7 +180,7 @@ class K8sService {
   async getPods(namespace = 'default') {
     if (!namespace) throw new Error('Namespace is required');
     await this.verifyClusterConnection();
-    
+
     const res = await this.coreV1Api.listNamespacedPod(namespace);
     return res.body.items.map(pod => ({
       name: pod.metadata.name,
@@ -186,7 +198,7 @@ class K8sService {
   async deletePod(name, namespace = 'default') {
     if (!name || !namespace) throw new Error('Pod name and namespace are required');
     await this.verifyClusterConnection();
-    
+
     await this.coreV1Api.deleteNamespacedPod(name, namespace);
     logger.info(`🗑️ Pod deleted: ${name} in namespace ${namespace}`);
     return { success: true, podName: name, namespace };
@@ -195,7 +207,7 @@ class K8sService {
   async restartPod(name, namespace = 'default') {
     if (!name || !namespace) throw new Error('Pod name and namespace are required');
     await this.verifyClusterConnection();
-    
+
     const pod = await this.coreV1Api.readNamespacedPod(name, namespace);
     await this.coreV1Api.deleteNamespacedPod(name, namespace);
     logger.info(`🔄 Restarted pod: ${name} in namespace ${namespace}`);
@@ -216,18 +228,18 @@ class K8sService {
     if (this.mode !== 'in-cluster') {
       return { mode: this.mode, message: 'ServiceAccount info only available in in-cluster mode' };
     }
-    
+
     try {
-      const fs = require('fs');
+      const fsSync = require('fs');
       const tokenPath = '/var/run/secrets/kubernetes.io/serviceaccount/token';
       const namespacePath = '/var/run/secrets/kubernetes.io/serviceaccount/namespace';
       const caPath = '/var/run/secrets/kubernetes.io/serviceaccount/ca.crt';
-      
+
       return {
-        serviceAccountTokenExists: fs.existsSync(tokenPath),
-        namespaceFileExists: fs.existsSync(namespacePath),
-        caCertExists: fs.existsSync(caPath),
-        currentNamespace: fs.existsSync(namespacePath) ? fs.readFileSync(namespacePath, 'utf8').trim() : 'unknown',
+        serviceAccountTokenExists: fsSync.existsSync(tokenPath),
+        namespaceFileExists: fsSync.existsSync(namespacePath),
+        caCertExists: fsSync.existsSync(caPath),
+        currentNamespace: fsSync.existsSync(namespacePath) ? fsSync.readFileSync(namespacePath, 'utf8').trim() : 'unknown',
         mode: this.mode
       };
     } catch (err) {
@@ -235,7 +247,8 @@ class K8sService {
       return { error: err.message };
     }
   }
-// Deployments
+
+  // Deployments (kept)
   async getDeployments(namespace = 'default') {
     await this.verifyClusterConnection();
     const res = await this.appsV1Api.listNamespacedDeployment(namespace);
@@ -248,7 +261,7 @@ class K8sService {
     }));
   }
 
-  // Services
+  // Services (kept)
   async getServices(namespace = 'default') {
     await this.verifyClusterConnection();
     const res = await this.coreV1Api.listNamespacedService(namespace);
@@ -268,7 +281,7 @@ class K8sService {
     }));
   }
 
-  // ConfigMaps
+  // ConfigMaps (kept)
   async getConfigMaps(namespace = 'default') {
     await this.verifyClusterConnection();
     const res = await this.coreV1Api.listNamespacedConfigMap(namespace);
@@ -281,7 +294,7 @@ class K8sService {
     }));
   }
 
-  // Secrets
+  // Secrets (kept)
   async getSecrets(namespace = 'default') {
     await this.verifyClusterConnection();
     const res = await this.coreV1Api.listNamespacedSecret(namespace);
@@ -294,7 +307,7 @@ class K8sService {
     }));
   }
 
-  // StatefulSets
+  // PersistentVolumes / PVCs (kept)
   async getPersistentVolumes() {
     await this.verifyClusterConnection();
     const res = await this.coreV1Api.listPersistentVolume();
@@ -324,20 +337,7 @@ class K8sService {
     }));
   }
 
-  // Apps Resources
-  async getDeployments(namespace = 'default') {
-    await this.verifyClusterConnection();
-    const res = await this.appsV1Api.listNamespacedDeployment(namespace);
-    return res.body.items.map(deploy => ({
-      name: deploy.metadata.name,
-      namespace: deploy.metadata.namespace,
-      replicas: deploy.status.replicas || 0,
-      readyReplicas: deploy.status.readyReplicas || 0,
-      availableReplicas: deploy.status.availableReplicas || 0,
-      strategy: deploy.spec.strategy?.type || 'RollingUpdate',
-      creationTimestamp: deploy.metadata.creationTimestamp
-    }));
-  }  
+  // StatefulSets (kept)
   async getStatefulSets(namespace = 'default') {
     await this.verifyClusterConnection();
     const res = await this.appsV1Api.listNamespacedStatefulSet(namespace);
@@ -351,7 +351,7 @@ class K8sService {
     }));
   }
 
-  // DaemonSets
+  // DaemonSets (kept)
   async getDaemonSets(namespace = 'default') {
     await this.verifyClusterConnection();
     const res = await this.appsV1Api.listNamespacedDaemonSet(namespace);
@@ -365,7 +365,7 @@ class K8sService {
     }));
   }
 
-  // Batch Resources
+  // Jobs & CronJobs (kept)
   async getJobs(namespace = 'default') {
     await this.verifyClusterConnection();
     const res = await this.batchV1Api.listNamespacedJob(namespace);
@@ -380,7 +380,6 @@ class K8sService {
     }));
   }
 
-  // CronJobs
   async getCronJobs(namespace = 'default') {
     await this.verifyClusterConnection();
     const res = await this.batchV1Api.listNamespacedCronJob(namespace);
@@ -393,24 +392,24 @@ class K8sService {
     }));
   }
 
-
   async getIngresses(namespace = 'default') {
-  await this.verifyClusterConnection();
-  const res = await this.networkingV1Api.listNamespacedIngress(namespace);
-  return res.body.items.map(ing => ({
-    name: ing.metadata.name,
-    namespace: ing.metadata.namespace,
-    hosts: ing.spec.rules?.map(r => r.host) || [],
-    creationTimestamp: ing.metadata.creationTimestamp
-  }));
+    await this.verifyClusterConnection();
+    const res = await this.networkingV1Api.listNamespacedIngress(namespace);
+    return res.body.items.map(ing => ({
+      name: ing.metadata.name,
+      namespace: ing.metadata.namespace,
+      hosts: ing.spec.rules?.map(r => r.host) || [],
+      creationTimestamp: ing.metadata.creationTimestamp
+    }));
   }
- // ======================
-  // Enhanced Pod Operations
+
+  // ======================
+  // Enhanced Pod Operations (existing enhanced ones)
   // ======================
   async getPodsWithStatus(namespace = 'default', statusFilter) {
     await this.verifyClusterConnection();
     const res = await this.coreV1Api.listNamespacedPod(namespace);
-    
+
     return res.body.items
       .filter(pod => !statusFilter || pod.status.phase === statusFilter)
       .map(pod => ({
@@ -439,43 +438,14 @@ class K8sService {
     );
   }
 
-  async deletePod(name, namespace = 'default') {
-    await this.verifyClusterConnection();
-    await this.coreV1Api.deleteNamespacedPod(name, namespace);
-    logger.info(`🗑️ Deleted pod ${name} in ${namespace}`);
-    return { success: true };
-  }
-
-  async restartPod(name, namespace = 'default') {
-    await this.verifyClusterConnection();
-    // Trigger redeploy by patching annotation
-    await this.appsV1Api.patchNamespacedDeployment(
-      name,
-      namespace,
-      {
-        spec: {
-          template: {
-            metadata: {
-              annotations: {
-                'kubectl.kubernetes.io/restartedAt': new Date().toISOString()
-              }
-            }
-          }
-        }
-      },
-      undefined, 'StrategicMergePatch'
-    );
-    logger.info(`🔄 Restarted pod ${name} in ${namespace}`);
-    return { success: true };
-  }
+  // NOTE: deletePod & restartPod already exist above and kept.
 
   // ======================
-  // Deployment Operations
+  // Deployment Operations (existing scale)
   // ======================
   async scaleDeployment(name, namespace = 'default', replicas) {
     await this.verifyClusterConnection();
-    if (replicas < 0 || replicas > 20) throw new Error('Replicas must be 0-20');
-    
+    if (replicas < 0 || replicas > 1000) throw new Error('Replicas must be a reasonable number');
     await this.appsV1Api.patchNamespacedDeploymentScale(
       name,
       namespace,
@@ -487,41 +457,311 @@ class K8sService {
   }
 
   // ======================
-  // Helm Operations
+  // Helper: sorting utility for formatted endpoints
   // ======================
-  async listHelmReleases(namespace) {
+  _sortData(data, sortBy, sortOrder = 'asc') {
+    if (!sortBy) return data;
+    const order = (sortOrder || 'asc').toLowerCase();
+    return [...data].sort((a, b) => {
+      const A = a[sortBy] ?? '';
+      const B = b[sortBy] ?? '';
+      if (A == null && B == null) return 0;
+      if (A == null) return order === 'desc' ? 1 : -1;
+      if (B == null) return order === 'desc' ? -1 : 1;
+      if (typeof A === 'number' && typeof B === 'number') {
+        return order === 'desc' ? B - A : A - B;
+      }
+      const aStr = String(A).toLowerCase();
+      const bStr = String(B).toLowerCase();
+      if (aStr < bStr) return order === 'desc' ? 1 : -1;
+      if (aStr > bStr) return order === 'desc' ? -1 : 1;
+      return 0;
+    });
+  }
+
+  // ======================
+  // New: Formatted summary endpoints
+  // ======================
+
+  /**
+   * getPodsFormatted
+   * supports:
+   * - namespace = '*' for all namespaces
+   * - filters: { status, errorPodsOnly }
+   * - sortBy, sortOrder
+   */
+  async getPodsFormatted(namespace = 'default', filters = {}, sortBy = null, sortOrder = 'asc') {
+    await this.verifyClusterConnection();
+    let res;
+    if (namespace === '*') {
+      res = await this.coreV1Api.listPodForAllNamespaces();
+    } else {
+      res = await this.coreV1Api.listNamespacedPod(namespace);
+    }
+
+    let pods = res.body.items || [];
+
+    if (filters.status) {
+      pods = pods.filter(p => (p.status.phase || '').toLowerCase() === String(filters.status).toLowerCase());
+    }
+
+    if (filters.errorPodsOnly) {
+      pods = pods.filter(p => (p.status.phase || '').toLowerCase() !== 'running');
+    }
+
+    const totalPods = pods.length;
+    const errorPods = pods.filter(p => (p.status?.phase || '').toLowerCase() !== 'running').length;
+
+    let data = pods.map(p => ({
+      name: p.metadata.name,
+      namespace: p.metadata.namespace,
+      status: p.status.phase,
+      nodeName: p.spec.nodeName,
+      startTime: p.status.startTime,
+      age: p.metadata.creationTimestamp,
+      restarts: p.status.containerStatuses?.reduce((acc, cs) => acc + cs.restartCount, 0) || 0,
+      containers: p.spec.containers?.map(c => c.name) || [],
+      actions: [
+        { label: 'Restart', method: 'POST', endpoint: `/api/k8s/pods/${encodeURIComponent(p.metadata.name)}/restart?namespace=${encodeURIComponent(p.metadata.namespace)}` },
+        { label: 'Delete', method: 'DELETE', endpoint: `/api/k8s/pods/${encodeURIComponent(p.metadata.name)}?namespace=${encodeURIComponent(p.metadata.namespace)}` },
+        { label: 'Logs', method: 'GET', endpoint: `/api/k8s/pods/${encodeURIComponent(p.metadata.name)}/logs?namespace=${encodeURIComponent(p.metadata.namespace)}` }
+      ]
+    }));
+
+    data = this._sortData(data, sortBy, sortOrder);
+
+    return formatK8sResponse({
+      filters: { namespace, ...filters, sortBy, sortOrder },
+      summary: { totalPods, errorPods },
+      data
+    });
+  }
+
+  /**
+   * getDeploymentsFormatted
+   * supports namespace='*', sorting
+   */
+  async getDeploymentsFormatted(namespace = 'default', sortBy = null, sortOrder = 'asc') {
+    await this.verifyClusterConnection();
+    let res;
+    if (namespace === '*') {
+      res = await this.appsV1Api.listDeploymentForAllNamespaces();
+    } else {
+      res = await this.appsV1Api.listNamespacedDeployment(namespace);
+    }
+
+    const deployments = res.body.items || [];
+
+    const total = deployments.length;
+    const unavailable = deployments.filter(d => (d.status.unavailableReplicas || 0) > 0).length;
+
+    let data = deployments.map(d => ({
+      name: d.metadata.name,
+      namespace: d.metadata.namespace,
+      desired: d.spec.replicas,
+      available: d.status.availableReplicas || 0,
+      ready: d.status.readyReplicas || 0,
+      strategy: d.spec.strategy?.type || 'RollingUpdate',
+      creationTimestamp: d.metadata.creationTimestamp,
+      actions: [
+        { label: 'Restart', method: 'POST', endpoint: `/api/k8s/deployments/${encodeURIComponent(d.metadata.name)}/restart?namespace=${encodeURIComponent(d.metadata.namespace)}` },
+        { label: 'Scale', method: 'PATCH', endpoint: `/api/k8s/deployments/${encodeURIComponent(d.metadata.name)}/scale` }
+      ]
+    }));
+
+    data = this._sortData(data, sortBy, sortOrder);
+
+    return formatK8sResponse({
+      filters: { namespace, sortBy, sortOrder },
+      summary: { total, unavailable },
+      data
+    });
+  }
+
+  /**
+   * getServicesFormatted
+   */
+  async getServicesFormatted(namespace = 'default', sortBy = null, sortOrder = 'asc') {
+    await this.verifyClusterConnection();
+    let res;
+    if (namespace === '*') {
+      res = await this.coreV1Api.listServiceForAllNamespaces();
+    } else {
+      res = await this.coreV1Api.listNamespacedService(namespace);
+    }
+
+    const services = res.body.items || [];
+    const total = services.length;
+
+    let data = services.map(s => ({
+      name: s.metadata.name,
+      namespace: s.metadata.namespace,
+      type: s.spec.type,
+      clusterIP: s.spec.clusterIP,
+      ports: s.spec.ports || [],
+      creationTimestamp: s.metadata.creationTimestamp,
+      actions: [
+        // No destructive actions by default for services; UI can decide.
+      ]
+    }));
+
+    data = this._sortData(data, sortBy, sortOrder);
+
+    return formatK8sResponse({
+      filters: { namespace, sortBy, sortOrder },
+      summary: { total },
+      data
+    });
+  }
+
+  // ======================
+  // Helm: list & actions via native CLI
+  // - helm list --output json
+  // - helm upgrade ...
+  // - helm rollback ...
+  // - helm uninstall ...
+  // ======================
+
+  async getHelmReleasesFormatted(namespace = 'default', sortBy = null, sortOrder = 'asc') {
     try {
-      const cmd = namespace 
-        ? `helm list --namespace ${namespace} --output json`
-        : `helm list --all-namespaces --output json`;
-      
+      // namespace='*' => all namespaces
+      const nsFlag = namespace === '*' ? '--all-namespaces' : `--namespace ${namespace}`;
+      const { stdout } = await execAsync(`helm list ${nsFlag} --output json`);
+      const releases = JSON.parse(stdout || '[]');
+
+      const total = releases.length;
+
+      let data = (releases || []).map(r => ({
+        name: r.name,
+        namespace: r.namespace,
+        revision: r.revision,
+        updated: r.updated,
+        status: r.status,
+        chart: r.chart,
+        appVersion: r.app_version || r.appVersion || null,
+        actions: [
+          { type: 'upgrade', label: 'Upgrade', method: 'POST', endpoint: `/api/k8s/helm/${encodeURIComponent(r.name)}/upgrade?namespace=${encodeURIComponent(r.namespace)}` },
+          { type: 'rollback', label: 'Rollback', method: 'POST', endpoint: `/api/k8s/helm/${encodeURIComponent(r.name)}/rollback?namespace=${encodeURIComponent(r.namespace)}` },
+          { type: 'delete', label: 'Delete', method: 'DELETE', endpoint: `/api/k8s/helm/${encodeURIComponent(r.name)}?namespace=${encodeURIComponent(r.namespace)}` }
+        ]
+      }));
+
+      data = this._sortData(data, sortBy, sortOrder);
+
+      return formatK8sResponse({
+        filters: { namespace, sortBy, sortOrder },
+        summary: { total },
+        data
+      });
+    } catch (err) {
+      logger.error('Helm list failed', { error: err.message });
+      return formatK8sResponse({
+        status: 'error',
+        filters: { namespace },
+        summary: {},
+        data: [],
+        errors: [err.message]
+      });
+    }
+  }
+
+  /**
+   * helmUpgrade
+   * body should contain: { chart, valuesFile?, additionalArgs? }
+   * chart may be name (repo/chart) or path
+   */
+  async helmUpgrade(releaseName, namespace = 'default', { chart, valuesFile, additionalArgs } = {}) {
+    if (!releaseName || !chart) throw new Error('releaseName and chart required for upgrade');
+    try {
+      const nsFlag = `--namespace ${namespace}`;
+      const valuesFlag = valuesFile ? `-f ${valuesFile}` : '';
+      const extra = additionalArgs || '';
+      // `helm upgrade --install releaseName chart ...`
+      const cmd = `helm upgrade --install ${releaseName} ${chart} ${nsFlag} ${valuesFlag} ${extra} --wait --timeout 300s --output json`;
       const { stdout } = await execAsync(cmd);
-      return JSON.parse(stdout);
+      // try to parse stdout if JSON; sometimes helm prints human-readable text
+      let result = stdout;
+      try {
+        result = JSON.parse(stdout);
+      } catch (parseErr) {
+        // keep raw output
+      }
+      logger.info(`Helm upgrade called for ${releaseName} (${namespace})`);
+      return formatK8sResponse({
+        filters: { releaseName, namespace },
+        summary: {},
+        data: [{ raw: result }]
+      });
     } catch (err) {
-      logger.error(`Helm list failed: ${err.message}`);
-      throw new Error('Failed to list releases. Ensure Helm is installed.');
+      logger.error('Helm upgrade failed', { error: err.message });
+      return formatK8sResponse({
+        status: 'error',
+        filters: { releaseName, namespace },
+        summary: {},
+        data: [],
+        errors: [err.message]
+      });
     }
   }
 
-  async uninstallHelmRelease(name, namespace) {
-    if (!name) throw new Error('Release name required');
-    
+  /**
+   * helmRollback
+   * body: { revision }
+   */
+  async helmRollback(releaseName, namespace = 'default', { revision } = {}) {
+    if (!releaseName) throw new Error('releaseName required for rollback');
     try {
-      await execAsync(`helm uninstall ${name} --namespace ${namespace || 'default'}`);
-      logger.info(`🗑️ Uninstalled Helm release ${name}`);
-      return { success: true };
+      const nsFlag = namespace ? `--namespace ${namespace}` : '';
+      const revFlag = revision ? `${revision}` : '';
+      const cmd = revFlag ? `helm rollback ${releaseName} ${revFlag} ${nsFlag}` : `helm rollback ${releaseName} ${nsFlag}`;
+      const { stdout } = await execAsync(cmd);
+      logger.info(`Helm rollback called for ${releaseName} (${namespace})`);
+      return formatK8sResponse({
+        filters: { releaseName, namespace, revision },
+        summary: {},
+        data: [{ raw: stdout }]
+      });
     } catch (err) {
-      logger.error(`Helm uninstall failed: ${err.stderr || err.message}`);
-      throw new Error(`Failed to uninstall ${name}`);
+      logger.error('Helm rollback failed', { error: err.message });
+      return formatK8sResponse({
+        status: 'error',
+        filters: { releaseName, namespace, revision },
+        summary: {},
+        data: [],
+        errors: [err.message]
+      });
     }
   }
 
-}
+  /**
+   * helmDelete
+   */
+  async helmDelete(releaseName, namespace = 'default') {
+    if (!releaseName) throw new Error('releaseName required for delete');
+    try {
+      const nsFlag = namespace ? `--namespace ${namespace}` : '';
+      const cmd = `helm uninstall ${releaseName} ${nsFlag}`;
+      const { stdout } = await execAsync(cmd);
+      logger.info(`Helm uninstall called for ${releaseName} (${namespace})`);
+      return formatK8sResponse({
+        filters: { releaseName, namespace },
+        summary: {},
+        data: [{ raw: stdout }]
+      });
+    } catch (err) {
+      logger.error('Helm uninstall failed', { error: err.message });
+      return formatK8sResponse({
+        status: 'error',
+        filters: { releaseName, namespace },
+        summary: {},
+        data: [],
+        errors: [err.message]
+      });
+    }
+  }
+} // end class
 
-
- 
 // Singleton export
-// Initialize and export as singleton
 const k8sService = new K8sService();
 await k8sService.init().catch(err => {
   logger.error('❌ Failed to initialize Kubernetes service', { error: err.message });

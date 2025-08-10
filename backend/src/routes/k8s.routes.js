@@ -1,3 +1,4 @@
+// routes/k8s.routes.js
 import express from 'express';
 import { authorize } from '../middleware/rbac.js';
 import k8sService from '../services/k8s.service.js';
@@ -16,7 +17,7 @@ const noCache = (req, res, next) => {
 
 router.get('/cluster-info', authorize(['admin', 'editor', 'viewer']), noCache, async (req, res, next) => {
   try {
-    const data = await k8sService.getClusterInfo();
+    const data = await k8sService.getClusterInfo?.() ?? { message: 'getClusterInfo not implemented' };
     res.json(data);
   } catch (err) {
     next(err);
@@ -141,7 +142,7 @@ router.get('/daemonsets', authorize(['admin', 'editor', 'viewer']), noCache, asy
 router.get('/replicasets', authorize(['admin', 'editor', 'viewer']), noCache, async (req, res, next) => {
   try {
     const namespace = req.query.namespace || 'default';
-    const replicasets = await k8sService.getReplicaSets(namespace);
+    const replicasets = await k8sService.getReplicaSets?.(namespace) ?? [];
     res.json(replicasets);
   } catch (err) {
     next(err);
@@ -151,7 +152,6 @@ router.get('/replicasets', authorize(['admin', 'editor', 'viewer']), noCache, as
 // ======================
 // Networking APIs
 // ======================
-
 router.get('/ingresses', authorize(['admin', 'editor', 'viewer']), noCache, async (req, res, next) => {
   try {
     const namespace = req.query.namespace || 'default';
@@ -165,7 +165,7 @@ router.get('/ingresses', authorize(['admin', 'editor', 'viewer']), noCache, asyn
 router.get('/networkpolicies', authorize(['admin', 'editor', 'viewer']), noCache, async (req, res, next) => {
   try {
     const namespace = req.query.namespace || 'default';
-    const policies = await k8sService.getNetworkPolicies(namespace);
+    const policies = await k8sService.getNetworkPolicies?.(namespace) ?? [];
     res.json(policies);
   } catch (err) {
     next(err);
@@ -175,7 +175,6 @@ router.get('/networkpolicies', authorize(['admin', 'editor', 'viewer']), noCache
 // ======================
 // Batch Jobs
 // ======================
-
 router.get('/jobs', authorize(['admin', 'editor', 'viewer']), noCache, async (req, res, next) => {
   try {
     const namespace = req.query.namespace || 'default';
@@ -197,7 +196,7 @@ router.get('/cronjobs', authorize(['admin', 'editor', 'viewer']), noCache, async
 });
 
 // ======================
-// Pod Actions
+// Pod Actions (existing)
 // ======================
 
 router.delete('/pods/:name', authorize(['admin', 'editor']), noCache, async (req, res, next) => {
@@ -220,66 +219,26 @@ router.post('/pods/:name/restart', authorize(['admin', 'editor']), noCache, asyn
   }
 });
 
-
-
-// Analyzer Health Summary Route
-// --------------------------------------------
-import { getClusterHealthSummary } from '../utils/analyzerHelper.js';
-
-router.get('/analyzer/health-summary', async (req, res) => {
-  try {
-    const summary = await getClusterHealthSummary();
-    res.json(summary);
-  } catch (error) {
-    console.error('Error in /analyzer/health-summary:', error);
-    res.status(500).json({ error: 'Failed to get cluster health summary' });
-  }
-});
-
-
-
-router.get('/pods', authorize(['admin', 'editor', 'viewer']), noCache, async (req, res, next) => {
-  try {
-    const { namespace, status } = req.query;
-    const pods = await k8sService.getPodsWithStatus(namespace || 'default', status);
-    res.json(pods);
-  } catch (err) {
-    next(err);
-  }
-});
-
+// ======================
+// Existing Pod logs
+// ======================
 router.get('/pods/:name/logs', authorize(['admin', 'editor', 'viewer']), noCache, async (req, res) => {
   try {
     const { name } = req.params;
-    const { namespace, tailLines = 100 } = req.query;
-    
+    const { namespace = 'default', tailLines = 100 } = req.query;
     res.setHeader('Content-Type', 'text/plain');
-    const logStream = await k8sService.streamPodLogs(name, namespace || 'default', tailLines);
-    logStream.pipe(res);
+    const logStream = await k8sService.streamPodLogs(name, namespace, tailLines);
+    // The client-node readNamespacedPodLog returns the log text when follow=false.
+    // If returning a stream isn't supported by yours, this will still return a string.
+    if (typeof logStream === 'string') {
+      res.send(logStream);
+    } else if (logStream && typeof logStream.pipe === 'function') {
+      logStream.pipe(res);
+    } else {
+      res.json({ logs: logStream });
+    }
   } catch (err) {
     res.status(500).json({ error: err.message });
-  }
-});
-
-router.delete('/pods/:name', authorize(['admin', 'editor']), noCache, async (req, res, next) => {
-  try {
-    const { name } = req.params;
-    const { namespace } = req.query;
-    await k8sService.deletePod(name, namespace || 'default');
-    res.json({ success: true });
-  } catch (err) {
-    next(err);
-  }
-});
-
-router.post('/pods/:name/restart', authorize(['admin', 'editor']), noCache, async (req, res, next) => {
-  try {
-    const { name } = req.params;
-    const { namespace } = req.query;
-    await k8sService.restartPod(name, namespace || 'default');
-    res.json({ success: true });
-  } catch (err) {
-    next(err);
   }
 });
 
@@ -308,12 +267,12 @@ router.patch('/deployments/:name/scale', authorize(['admin', 'editor']), noCache
 });
 
 // ======================
-// Helm Release APIs
+// Helm Release APIs (existing + new)
 // ======================
 router.get('/helm/releases', authorize(['admin', 'editor', 'viewer']), noCache, async (req, res, next) => {
   try {
     const { namespace } = req.query;
-    const releases = await k8sService.listHelmReleases(namespace);
+    const releases = await k8sService.listHelmReleases?.(namespace) ?? [];
     res.json(releases);
   } catch (err) {
     next(err);
@@ -324,14 +283,129 @@ router.delete('/helm/releases/:name', authorize(['admin']), noCache, async (req,
   try {
     const { name } = req.params;
     const { namespace } = req.query;
-    await k8sService.uninstallHelmRelease(name, namespace);
+    await k8sService.uninstallHelmRelease?.(name, namespace);
     res.json({ success: true });
   } catch (err) {
     next(err);
   }
 });
 
+// ======================
+// NEW: Summary endpoints (healthSummary-style responses)
+// ======================
 
+router.get(
+  '/pods/summary',
+  authorize(['admin', 'editor', 'viewer']),
+  noCache,
+  async (req, res, next) => {
+    try {
+      const namespace = req.query.namespace || 'default';
+      const status = req.query.status || null;
+      const errorPodsOnly = req.query.errorPodsOnly === 'true';
+      const sortBy = req.query.sortBy || null;
+      const sortOrder = req.query.sortOrder || 'asc';
+      const result = await k8sService.getPodsFormatted(namespace, { status, errorPodsOnly }, sortBy, sortOrder);
+      res.json(result);
+    } catch (err) {
+      next(err);
+    }
+  }
+);
 
+router.get(
+  '/deployments/summary',
+  authorize(['admin', 'editor', 'viewer']),
+  noCache,
+  async (req, res, next) => {
+    try {
+      const namespace = req.query.namespace || 'default';
+      const sortBy = req.query.sortBy || null;
+      const sortOrder = req.query.sortOrder || 'asc';
+      const result = await k8sService.getDeploymentsFormatted(namespace, sortBy, sortOrder);
+      res.json(result);
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+router.get(
+  '/services/summary',
+  authorize(['admin', 'editor', 'viewer']),
+  noCache,
+  async (req, res, next) => {
+    try {
+      const namespace = req.query.namespace || 'default';
+      const sortBy = req.query.sortBy || null;
+      const sortOrder = req.query.sortOrder || 'asc';
+      const result = await k8sService.getServicesFormatted(namespace, sortBy, sortOrder);
+      res.json(result);
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+// Helm summary (native CLI)
+router.get(
+  '/helm/summary',
+  authorize(['admin', 'editor', 'viewer']),
+  noCache,
+  async (req, res, next) => {
+    try {
+      const namespace = req.query.namespace || 'default';
+      const sortBy = req.query.sortBy || null;
+      const sortOrder = req.query.sortOrder || 'asc';
+      const result = await k8sService.getHelmReleasesFormatted(namespace, sortBy, sortOrder);
+      res.json(result);
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+// ======================
+// NEW: Helm action routes
+// POST /api/.../helm/:release/upgrade
+// POST /api/.../helm/:release/rollback
+// DELETE /api/.../helm/:release
+// ======================
+
+router.post('/helm/:name/upgrade', authorize(['admin', 'editor']), noCache, async (req, res, next) => {
+  try {
+    const releaseName = req.params.name;
+    const namespace = req.query.namespace || req.body.namespace || 'default';
+    // Expect body: { chart, valuesFile, additionalArgs }
+    const { chart, valuesFile, additionalArgs } = req.body;
+    const result = await k8sService.helmUpgrade(releaseName, namespace, { chart, valuesFile, additionalArgs });
+    res.json(result);
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post('/helm/:name/rollback', authorize(['admin', 'editor']), noCache, async (req, res, next) => {
+  try {
+    const releaseName = req.params.name;
+    const namespace = req.query.namespace || req.body.namespace || 'default';
+    const { revision } = req.body;
+    const result = await k8sService.helmRollback(releaseName, namespace, { revision });
+    res.json(result);
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.delete('/helm/:name', authorize(['admin']), noCache, async (req, res, next) => {
+  try {
+    const releaseName = req.params.name;
+    const namespace = req.query.namespace || 'default';
+    const result = await k8sService.helmDelete(releaseName, namespace);
+    res.json(result);
+  } catch (err) {
+    next(err);
+  }
+});
 
 export default router;
