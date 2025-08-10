@@ -10,7 +10,7 @@ import HomeView from './HomeView';
 import AnalyzerView from './AnalyzerView';
 import ResourcesView from './ResourcesView';
 import LogsView from './LogsView';
-import PodActionsView from './AnalyzerView/PodActionView';
+import PodActionsView from './AnalyzerView/PodActionView/PodActionView';
 
 import { hasPermission } from '../utils/permissions';
 import { useAuth } from '../context/AuthContext';
