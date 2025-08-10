@@ -11,7 +11,7 @@ import {
   AdminPanelSettings as AdminPanelSettingsIcon,
   Visibility as VisibilityIcon
 } from '@mui/icons-material';
-import { PERMISSION_OPTIONS, ROLE_PRESETS } from '../config/permissions';
+import { PERMISSION_OPTIONS, ROLE_PRESETS } from '../utils/permissions';
 
 const Header = ({ currentView, setCurrentView, handleLogout, currentUser }) => {
   const [anchorEl, setAnchorEl] = useState(null);
