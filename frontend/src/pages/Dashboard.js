@@ -7,10 +7,10 @@ import Sidebar from '../components/Sidebar';
 import Header from '../components/Header';
 
 import HomeView from './HomeView';
-import AnalyzerView from '../pages/AnalyzerView';
-import ResourcesView from '../pages/ResourcesView';
+import AnalyzerView from './pages/AnalyzerView';
+import ResourcesView from './pages/ResourcesView';
 import LogsView from './LogsView';
-import PodActionsView from '../pages/AnalyzerView/PodActionView';
+import PodActionsView from './pages/AnalyzerView/PodActionView';
 
 import { hasPermission } from '../utils/permissions';
 import { useAuth } from '../context/AuthContext';
