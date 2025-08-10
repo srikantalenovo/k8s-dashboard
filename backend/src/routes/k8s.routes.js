@@ -408,4 +408,19 @@ router.delete('/helm/:name', authorize(['admin']), noCache, async (req, res, nex
   }
 });
 
+// Analyzer Health Summary Route
+// --------------------------------------------
+import { getClusterHealthSummary } from '../utils/analyzerHelper.js';
+
+router.get('/analyzer/health-summary', async (req, res) => {
+  try {
+    const summary = await getClusterHealthSummary();
+    res.json(summary);
+  } catch (error) {
+    console.error('Error in /analyzer/health-summary:', error);
+    res.status(500).json({ error: 'Failed to get cluster health summary' });
+  }
+});
+
+
 export default router;
