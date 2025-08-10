@@ -100,6 +100,7 @@ const Sidebar = ({ currentUser }) => {
             ))}
         </List>
 
+        {/* Pod Actions Link */}
         <List>
           <ListItem disablePadding sx={{ display: 'block' }}>
             <NavLink

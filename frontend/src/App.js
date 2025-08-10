@@ -21,7 +21,7 @@ function App() {
         element={!token ? <Signup /> : <Navigate to="/dashboard" replace />}
       />
       <Route
-        path="/dashboard"
+        path="/dashboard/*"
         element={token ? <Dashboard /> : <Navigate to="/login" replace />}
       />
       <Route

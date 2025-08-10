@@ -25,22 +25,35 @@ const Dashboard = () => {
     navigate('/login');
   };
 
-  const currentView = location.pathname.split('/')[2] || 'home';
+  // Extract current view key from URL, fallback to 'home' if none
+  const pathSegments = location.pathname.split('/');
+  // Example URL: /dashboard/home → pathSegments[2] = 'home'
+  const currentView = pathSegments[2]?.toLowerCase() || 'home';
 
   return (
     <Box sx={{ display: 'flex' }}>
-      <Sidebar currentUser={currentUser} />
+      <Sidebar
+        currentUser={currentUser}
+        currentView={currentView}
+        setCurrentView={(view) => {
+          // Navigate to the clicked view's URL
+          navigate(`/dashboard/${view.toLowerCase()}`);
+        }}
+      />
 
       <Box sx={{ flexGrow: 1 }}>
         <Container maxWidth="xl" sx={{ p: 2 }}>
           <Header
             currentView={currentView}
-            setCurrentView={() => {}}
+            setCurrentView={(view) => {
+              navigate(`/dashboard/${view.toLowerCase()}`);
+            }}
             handleLogout={handleLogout}
             currentUser={currentUser}
           />
 
           <Routes>
+            {/* Redirect /dashboard to /dashboard/home */}
             <Route path="/" element={<Navigate to="/dashboard/home" replace />} />
 
             <Route path="home" element={<HomeView />} />
@@ -55,6 +68,7 @@ const Dashboard = () => {
                 )
               }
             />
+
             <Route
               path="resources"
               element={
@@ -65,6 +79,7 @@ const Dashboard = () => {
                 )
               }
             />
+
             <Route
               path="logs"
               element={
@@ -87,6 +102,7 @@ const Dashboard = () => {
               }
             />
 
+            {/* Fallback: redirect unknown paths to home */}
             <Route path="*" element={<Navigate to="/dashboard/home" replace />} />
           </Routes>
         </Container>
